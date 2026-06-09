@@ -49,7 +49,7 @@
 		]
 	},
 	"devDependencies": {
-		"@n8n/eslint-plugin-community-nodes": "^0.9.0",
+		"@n8n/eslint-plugin-community-nodes": "^0.19.0",
 		"@types/jest": "^30.0.0",
 		"@types/node": "^25.0.3",
 		"eslint": "^10.0.0",
