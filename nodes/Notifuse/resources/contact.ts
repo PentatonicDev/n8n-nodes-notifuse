@@ -1,5 +1,5 @@
 import { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { notifuseApiRequest } from '../GenericFunctions';
+import { keyValueProperty, keyValueToObject, notifuseApiRequest } from '../GenericFunctions';
 
 /**
  * Contact resource — GOLDEN REFERENCE module.
@@ -30,15 +30,18 @@ const contactAttributeFields: INodeProperties[] = [
 	{ displayName: 'Country', name: 'country', type: 'string', default: '' },
 	{ displayName: 'Postcode', name: 'postcode', type: 'string', default: '' },
 	{ displayName: 'State', name: 'state', type: 'string', default: '' },
-	{
-		displayName: 'Custom Fields (JSON)',
-		name: 'customFieldsJson',
-		type: 'json',
-		default: '{}',
-		description:
-			'Custom attributes merged into the contact: custom_string_1..5, custom_number_1..5, custom_datetime_1..5, custom_json_1..5',
-	},
 ];
+
+// Reusable key/value custom-fields property (used by upsert "Additional Fields").
+// Keys: custom_string_1..5, custom_number_1..5, custom_datetime_1..5, custom_json_1..5.
+const customFieldsProperty = keyValueProperty({
+	name: 'customFields',
+	displayName: 'Custom Fields',
+	placeholder: 'Add Custom Field',
+	description:
+		'Custom attributes merged into the contact: custom_string_1..5, custom_number_1..5, custom_datetime_1..5, custom_json_1..5',
+	displayOptions: { show: { resource: ['contact'], operation: ['upsert'] } },
+});
 
 export const contactOperations: INodeProperties[] = [
 	{
@@ -116,6 +119,7 @@ export const contactFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['contact'], operation: ['upsert'] } },
 		options: contactAttributeFields,
 	},
+	customFieldsProperty,
 
 	// ---------- getByEmail ----------
 	{
@@ -230,22 +234,22 @@ export const contactFields: INodeProperties[] = [
 		displayName: 'Subscribe to Lists',
 		name: 'subscribe_to_lists',
 		type: 'string',
-		default: '',
-		placeholder: 'list_1,list_2',
+		typeOptions: { multipleValues: true, multipleValueButtonText: 'Add List ID' },
+		default: [],
+		placeholder: 'list_id',
 		displayOptions: { show: { resource: ['contact'], operation: ['import'] } },
-		description: 'Comma-separated list IDs to subscribe all imported contacts to',
+		description: 'List IDs to subscribe all imported contacts to',
 	},
 ];
 
-function buildContactObject(email: string, additionalFields: IDataObject): IDataObject {
+function buildContactObject(
+	email: string,
+	additionalFields: IDataObject,
+	customFields: IDataObject,
+): IDataObject {
 	const contact: IDataObject = { email };
-	const { customFieldsJson, ...rest } = additionalFields;
-	Object.assign(contact, rest);
-	if (customFieldsJson) {
-		const parsed =
-			typeof customFieldsJson === 'string' ? JSON.parse(customFieldsJson) : customFieldsJson;
-		Object.assign(contact, parsed);
-	}
+	Object.assign(contact, additionalFields);
+	Object.assign(contact, keyValueToObject(customFields));
 	return contact;
 }
 
@@ -257,7 +261,8 @@ export async function executeContact(
 	if (operation === 'upsert') {
 		const email = this.getNodeParameter('email', i) as string;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-		const contact = buildContactObject(email, additionalFields);
+		const customFields = this.getNodeParameter('customFields', i, {}) as IDataObject;
+		const contact = buildContactObject(email, additionalFields, customFields);
 		return await notifuseApiRequest.call(this, 'POST', '/api/contacts.upsert', { contact });
 	}
 
@@ -315,9 +320,9 @@ export async function executeContact(
 		const contactsRaw = this.getNodeParameter('contacts', i) as string | IDataObject[];
 		const contacts = typeof contactsRaw === 'string' ? JSON.parse(contactsRaw) : contactsRaw;
 		const body: IDataObject = { contacts };
-		const subscribeToLists = this.getNodeParameter('subscribe_to_lists', i, '') as string;
-		if (subscribeToLists) {
-			body.subscribe_to_lists = subscribeToLists.split(',').map((id) => id.trim());
+		const subscribeToLists = this.getNodeParameter('subscribe_to_lists', i, []) as string[];
+		if (subscribeToLists.length) {
+			body.subscribe_to_lists = subscribeToLists;
 		}
 		return await notifuseApiRequest.call(this, 'POST', '/api/contacts.import', body);
 	}

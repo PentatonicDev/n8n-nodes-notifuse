@@ -1,5 +1,5 @@
 import { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { notifuseApiRequest } from '../GenericFunctions';
+import { keyValueProperty, keyValueToObject, notifuseApiRequest } from '../GenericFunctions';
 
 /**
  * Template resource module.
@@ -51,13 +51,6 @@ const createUpdateAdditionalFields: INodeProperties[] = [
 		description: 'ID of the template macro (layout) to use',
 	},
 	{
-		displayName: 'Test Data (JSON)',
-		name: 'test_data',
-		type: 'json',
-		default: '{}',
-		description: 'Test data for template preview',
-	},
-	{
 		displayName: 'Settings (JSON)',
 		name: 'settings',
 		type: 'json',
@@ -65,6 +58,10 @@ const createUpdateAdditionalFields: INodeProperties[] = [
 		description: 'Channel-specific settings',
 	},
 ];
+
+const CREATE_OPTS = { show: { resource: ['template'], operation: ['create'] } };
+const UPDATE_OPTS = { show: { resource: ['template'], operation: ['update'] } };
+const COMPILE_OPTS = { show: { resource: ['template'], operation: ['compile'] } };
 
 export const templateOperations: INodeProperties[] = [
 	{
@@ -203,6 +200,13 @@ export const templateFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['template'], operation: ['create'] } },
 		description: 'Category of the template',
 	},
+	keyValueProperty({
+		name: 'testData',
+		displayName: 'Test Data',
+		placeholder: 'Add Test Variable',
+		description: 'Key/value pairs used for template preview (built into the test_data object)',
+		displayOptions: CREATE_OPTS,
+	}),
 	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
@@ -252,6 +256,13 @@ export const templateFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['template'], operation: ['update'] } },
 		description: 'Category of the template',
 	},
+	keyValueProperty({
+		name: 'testData',
+		displayName: 'Test Data',
+		placeholder: 'Add Test Variable',
+		description: 'Key/value pairs used for template preview (built into the test_data object)',
+		displayOptions: UPDATE_OPTS,
+	}),
 	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
@@ -292,6 +303,72 @@ export const templateFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['template'], operation: ['compile'] } },
 		description: 'MJML visual editor tree structure (must have type "mjml")',
 	},
+	keyValueProperty({
+		name: 'testData',
+		displayName: 'Test Data',
+		placeholder: 'Add Test Variable',
+		description: 'Key/value pairs used for Liquid templating during compilation',
+		displayOptions: COMPILE_OPTS,
+	}),
+	{
+		displayName: 'Tracking Settings',
+		name: 'trackingSettings',
+		type: 'collection',
+		placeholder: 'Add Tracking Setting',
+		default: {},
+		displayOptions: { show: { resource: ['template'], operation: ['compile'] } },
+		options: [
+			{
+				displayName: 'Enable Tracking',
+				name: 'enable_tracking',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to enable click/open tracking',
+			},
+			{
+				displayName: 'Endpoint',
+				name: 'endpoint',
+				type: 'string',
+				default: '',
+				description: 'API endpoint for tracking redirects',
+			},
+			{
+				displayName: 'UTM Campaign',
+				name: 'utm_campaign',
+				type: 'string',
+				default: '',
+				description: 'UTM campaign parameter',
+			},
+			{
+				displayName: 'UTM Content',
+				name: 'utm_content',
+				type: 'string',
+				default: '',
+				description: 'UTM content parameter',
+			},
+			{
+				displayName: 'UTM Medium',
+				name: 'utm_medium',
+				type: 'string',
+				default: '',
+				description: 'UTM medium parameter',
+			},
+			{
+				displayName: 'UTM Source',
+				name: 'utm_source',
+				type: 'string',
+				default: '',
+				description: 'UTM source parameter',
+			},
+			{
+				displayName: 'UTM Term',
+				name: 'utm_term',
+				type: 'string',
+				default: '',
+				description: 'UTM term parameter',
+			},
+		],
+	},
 	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
@@ -300,6 +377,14 @@ export const templateFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['template'], operation: ['compile'] } },
 		options: [
+			{
+				displayName: 'Channel',
+				name: 'channel',
+				type: 'options',
+				default: 'email',
+				options: channelOptions,
+				description: 'Channel filter for block visibility',
+			},
 			{
 				displayName: 'Subject',
 				name: 'subject',
@@ -313,29 +398,6 @@ export const templateFields: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Optional inbox preview text rendered through the Liquid engine',
-			},
-			{
-				displayName: 'Test Data (JSON)',
-				name: 'test_data',
-				type: 'json',
-				default: '{}',
-				description: 'Data to use for Liquid templating',
-			},
-			{
-				displayName: 'Tracking Settings (JSON)',
-				name: 'tracking_settings',
-				type: 'json',
-				default: '{}',
-				description:
-					'Tracking settings object: enable_tracking, endpoint, utm_source, utm_medium, utm_campaign, utm_content, utm_term',
-			},
-			{
-				displayName: 'Channel',
-				name: 'channel',
-				type: 'options',
-				default: 'email',
-				options: channelOptions,
-				description: 'Channel filter for block visibility',
 			},
 		],
 	},
@@ -375,29 +437,25 @@ export async function executeTemplate(
 		const name = this.getNodeParameter('name', i) as string;
 		const channel = this.getNodeParameter('channel', i) as string;
 		const category = this.getNodeParameter('category', i) as string;
+		const testDataRaw = this.getNodeParameter('testData', i, {}) as IDataObject;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
 		const body: IDataObject = { id, name, channel, category };
 
-		const emailRaw = additionalFields.email;
-		const webRaw = additionalFields.web;
-		const testDataRaw = additionalFields.test_data;
-		const settingsRaw = additionalFields.settings;
+		const testData = keyValueToObject(testDataRaw);
+		if (Object.keys(testData).length) body.test_data = testData;
 
-		const email = parseJsonField(emailRaw);
+		const email = parseJsonField(additionalFields.email);
 		if (email) body.email = email;
 
-		const web = parseJsonField(webRaw);
+		const web = parseJsonField(additionalFields.web);
 		if (web) body.web = web;
 
 		if (additionalFields.template_macro_id) {
 			body.template_macro_id = additionalFields.template_macro_id;
 		}
 
-		const testData = parseJsonField(testDataRaw);
-		if (testData) body.test_data = testData;
-
-		const settings = parseJsonField(settingsRaw);
+		const settings = parseJsonField(additionalFields.settings);
 		if (settings) body.settings = settings;
 
 		return await notifuseApiRequest.call(this, 'POST', '/api/templates.create', body);
@@ -408,29 +466,25 @@ export async function executeTemplate(
 		const name = this.getNodeParameter('name', i) as string;
 		const channel = this.getNodeParameter('channel', i) as string;
 		const category = this.getNodeParameter('category', i) as string;
+		const testDataRaw = this.getNodeParameter('testData', i, {}) as IDataObject;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
 		const body: IDataObject = { id, name, channel, category };
 
-		const emailRaw = additionalFields.email;
-		const webRaw = additionalFields.web;
-		const testDataRaw = additionalFields.test_data;
-		const settingsRaw = additionalFields.settings;
+		const testData = keyValueToObject(testDataRaw);
+		if (Object.keys(testData).length) body.test_data = testData;
 
-		const email = parseJsonField(emailRaw);
+		const email = parseJsonField(additionalFields.email);
 		if (email) body.email = email;
 
-		const web = parseJsonField(webRaw);
+		const web = parseJsonField(additionalFields.web);
 		if (web) body.web = web;
 
 		if (additionalFields.template_macro_id) {
 			body.template_macro_id = additionalFields.template_macro_id;
 		}
 
-		const testData = parseJsonField(testDataRaw);
-		if (testData) body.test_data = testData;
-
-		const settings = parseJsonField(settingsRaw);
+		const settings = parseJsonField(additionalFields.settings);
 		if (settings) body.settings = settings;
 
 		return await notifuseApiRequest.call(this, 'POST', '/api/templates.update', body);
@@ -444,6 +498,8 @@ export async function executeTemplate(
 	if (operation === 'compile') {
 		const messageId = this.getNodeParameter('message_id', i) as string;
 		const visualEditorTreeRaw = this.getNodeParameter('visual_editor_tree', i) as string | IDataObject;
+		const testDataRaw = this.getNodeParameter('testData', i, {}) as IDataObject;
+		const trackingSettings = this.getNodeParameter('trackingSettings', i, {}) as IDataObject;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
 		const visualEditorTree =
@@ -453,17 +509,22 @@ export async function executeTemplate(
 
 		const body: IDataObject = { message_id: messageId, visual_editor_tree: visualEditorTree };
 
+		const testData = keyValueToObject(testDataRaw);
+		if (Object.keys(testData).length) body.test_data = testData;
+
+		// Build tracking_settings from structured collection fields
+		const tracking: IDataObject = {};
+		if (trackingSettings.enable_tracking !== undefined && trackingSettings.enable_tracking !== false) {
+			tracking.enable_tracking = trackingSettings.enable_tracking;
+		}
+		for (const key of ['endpoint', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']) {
+			if (trackingSettings[key]) tracking[key] = trackingSettings[key];
+		}
+		if (Object.keys(tracking).length) body.tracking_settings = tracking;
+
 		if (additionalFields.subject) body.subject = additionalFields.subject;
 		if (additionalFields.subject_preview) body.subject_preview = additionalFields.subject_preview;
 		if (additionalFields.channel) body.channel = additionalFields.channel;
-
-		const testDataRaw = additionalFields.test_data;
-		const testData = parseJsonField(testDataRaw);
-		if (testData) body.test_data = testData;
-
-		const trackingSettingsRaw = additionalFields.tracking_settings;
-		const trackingSettings = parseJsonField(trackingSettingsRaw);
-		if (trackingSettings) body.tracking_settings = trackingSettings;
 
 		return await notifuseApiRequest.call(this, 'POST', '/api/templates.compile', body);
 	}

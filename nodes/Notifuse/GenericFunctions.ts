@@ -1,10 +1,12 @@
 import {
 	IDataObject,
+	IDisplayOptions,
 	IExecuteFunctions,
 	IHookFunctions,
 	IHttpRequestMethods,
 	IHttpRequestOptions,
 	ILoadOptionsFunctions,
+	INodeProperties,
 	IWebhookFunctions,
 	JsonObject,
 	NodeApiError,
@@ -15,6 +17,55 @@ export type NotifuseContext =
 	| ILoadOptionsFunctions
 	| IHookFunctions
 	| IWebhookFunctions;
+
+/**
+ * Builds a `fixedCollection` key/value property (a friendly UI for arbitrary
+ * JSON objects like metadata or template data). Pair with `keyValueToObject` in
+ * execute to turn the rows back into a plain object.
+ */
+export function keyValueProperty(config: {
+	name: string;
+	displayName: string;
+	description: string;
+	displayOptions: IDisplayOptions;
+	placeholder?: string;
+}): INodeProperties {
+	return {
+		displayName: config.displayName,
+		name: config.name,
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: config.placeholder ?? 'Add Item',
+		default: {},
+		displayOptions: config.displayOptions,
+		description: config.description,
+		options: [
+			{
+				name: 'values',
+				displayName: 'Item',
+				values: [
+					{ displayName: 'Key', name: 'key', type: 'string', default: '' },
+					{ displayName: 'Value', name: 'value', type: 'string', default: '' },
+				],
+			},
+		],
+	};
+}
+
+/**
+ * Converts a `fixedCollection` (key/value rows) parameter into a plain object,
+ * e.g. `{ values: [{ key: 'a', value: '1' }] }` → `{ a: '1' }`. Used to build
+ * JSON payloads (template data, metadata) from a friendly key/value UI.
+ */
+export function keyValueToObject(collection: IDataObject | undefined, rowsKey = 'values'): IDataObject {
+	const rows = (collection?.[rowsKey] as IDataObject[]) ?? [];
+	const out: IDataObject = {};
+	for (const row of rows) {
+		const key = row.key as string;
+		if (key) out[key] = row.value;
+	}
+	return out;
+}
 
 /**
  * Returns the base URL configured in the credential, without a trailing slash.

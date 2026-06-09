@@ -71,10 +71,10 @@ export const listFields: INodeProperties[] = [
 		name: 'list_ids',
 		type: 'string',
 		required: true,
-		default: '',
-		placeholder: 'list_1,list_2,list_3',
+		default: [],
+		typeOptions: { multipleValues: true, multipleValueButtonText: 'Add List ID' },
 		displayOptions: { show: { resource: ['list'], operation: ['subscribe', 'subscribePublic'] } },
-		description: 'Comma-separated list of list IDs to subscribe the contact to',
+		description: 'List IDs to subscribe the contact to',
 	},
 	{
 		displayName: 'Additional Fields',
@@ -137,10 +137,9 @@ export async function executeList(
 ): Promise<IDataObject | IDataObject[]> {
 	if (operation === 'subscribe') {
 		const email = this.getNodeParameter('email', i) as string;
-		const listIdsStr = this.getNodeParameter('list_ids', i) as string;
+		const listIds = this.getNodeParameter('list_ids', i) as string[];
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
-		const listIds = listIdsStr.split(',').map((id) => id.trim());
 		const contact = buildContactObject(email, additionalFields);
 
 		return await notifuseApiRequest.call(this, 'POST', '/api/lists.subscribe', {
@@ -151,10 +150,9 @@ export async function executeList(
 
 	if (operation === 'subscribePublic') {
 		const email = this.getNodeParameter('email', i) as string;
-		const listIdsStr = this.getNodeParameter('list_ids', i) as string;
+		const listIds = this.getNodeParameter('list_ids', i) as string[];
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
-		const listIds = listIdsStr.split(',').map((id) => id.trim());
 		const contact = buildContactObject(email, additionalFields);
 
 		return await notifuseApiRequest.call(this, 'POST', '/subscribe', {

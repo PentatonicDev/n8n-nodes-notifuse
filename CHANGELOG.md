@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-09
+
+### Changed
+
+- **Friendlier inputs for nested config across all action resources** (modeled on the n8n AWS SES
+  "Send Template" action). Added shared helpers `keyValueProperty` / `keyValueToObject`.
+  - **Transactional**: Template Data and Metadata as key/value rows; Email Options collection with
+    From Name, Subject, Subject Preview, Reply To, and multi-value Cc/Bcc address lists.
+  - **Broadcast**: `audience` as individual fields (List ID, Segments list, Exclude Unsubscribed);
+    `utm_parameters` as a collection; `metadata` as key/value rows; feed `headers` as a name/value
+    collection. Complex trees (`test_settings`, `data_feed`, `schedule`) stay JSON.
+  - **Template**: `test_data` as key/value rows; compile `tracking_settings` as a collection.
+    MJML/Tiptap content (`email`, `web`, `visual_editor_tree`) stays JSON.
+  - **Contact**: custom fields as key/value rows; `subscribe_to_lists` as a multi-value list.
+  - **List**: `list_ids` as a multi-value list.
+  - **Custom Event**: events as a structured collection (Email, Event Name, External ID,
+    Occurred At, Goal Type, Source, key/value Properties).
+
 ## [1.4.0] - 2026-06-09
 
 ### Changed

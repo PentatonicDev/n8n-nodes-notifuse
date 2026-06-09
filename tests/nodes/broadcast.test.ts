@@ -56,11 +56,13 @@ describe('Notifuse Broadcast resource', () => {
 	});
 
 	// ------------------------------------------------------------------ create
-	it('create parses audience JSON and injects workspace_id', async () => {
+	it('create assembles audience from structured fields and injects workspace_id', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				name: 'Summer Campaign',
-				audience: '{"list":"list_abc","exclude_unsubscribed":true}',
+				audienceList: 'list_abc',
+				audienceSegments: ['seg_1', 'seg_2'],
+				audienceExcludeUnsubscribed: true,
 				additionalFields: {},
 			},
 			apiResponse: { broadcast: { id: 'bcast_new' } },
@@ -74,19 +76,36 @@ describe('Notifuse Broadcast resource', () => {
 		expect(req.body).toMatchObject({
 			workspace_id: 'ws_test',
 			name: 'Summer Campaign',
-			audience: { list: 'list_abc', exclude_unsubscribed: true },
+			audience: {
+				list: 'list_abc',
+				segments: ['seg_1', 'seg_2'],
+				exclude_unsubscribed: true,
+			},
 		});
 	});
 
-	it('create parses utm_parameters JSON from additionalFields', async () => {
+	it('create omits empty audience segments and exclude_unsubscribed', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				name: 'Minimal',
+				audienceList: 'list_min',
+				additionalFields: {},
+			},
+		});
+
+		await executeBroadcast.call(ctx, 'create', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body?.audience).toEqual({ list: 'list_min' });
+	});
+
+	it('create builds utm_parameters from the collection field', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				name: 'UTM Campaign',
-				audience: '{"list":"list_1"}',
-				additionalFields: {
-					utm_parameters: '{"source":"newsletter","medium":"email"}',
-					tracking_enabled: true,
-				},
+				audienceList: 'list_1',
+				utm_parameters: { source: 'newsletter', medium: 'email' },
+				additionalFields: { tracking_enabled: true },
 			},
 		});
 
@@ -99,15 +118,15 @@ describe('Notifuse Broadcast resource', () => {
 		});
 	});
 
-	it('create parses test_settings, data_feed and metadata JSON fields', async () => {
+	it('create parses test_settings and data_feed JSON and builds metadata from key/value rows', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				name: 'AB Test',
-				audience: '{"list":"list_2"}',
+				audienceList: 'list_2',
+				metadata: { values: [{ key: 'tag', value: 'promo' }] },
 				additionalFields: {
 					test_settings: '{"enabled":true}',
-					data_feed: '{"global_feed":"https://feed.example.com"}',
-					metadata: '{"tag":"promo"}',
+					data_feed: '{"global_feed":{"enabled":true}}',
 				},
 			},
 		});
@@ -117,18 +136,18 @@ describe('Notifuse Broadcast resource', () => {
 		const req = firstAuthRequest(httpRequestWithAuthentication);
 		expect(req.body).toMatchObject({
 			test_settings: { enabled: true },
-			data_feed: { global_feed: 'https://feed.example.com' },
+			data_feed: { global_feed: { enabled: true } },
 			metadata: { tag: 'promo' },
 		});
 	});
 
 	// ------------------------------------------------------------------ update
-	it('update sends id, name, parsed audience and workspace_id', async () => {
+	it('update sends id, name, assembled audience and workspace_id', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				id: 'bcast_1',
 				name: 'Updated Name',
-				audience: '{"list":"list_b"}',
+				audienceList: 'list_b',
 				additionalFields: {},
 			},
 		});
@@ -151,7 +170,7 @@ describe('Notifuse Broadcast resource', () => {
 			params: {
 				id: 'bcast_2',
 				name: 'Scheduled Update',
-				audience: '{"list":"list_c"}',
+				audienceList: 'list_c',
 				additionalFields: {
 					schedule: '{"is_scheduled":true,"scheduled_date":"2026-07-01"}',
 				},
@@ -343,13 +362,13 @@ describe('Notifuse Broadcast resource', () => {
 		});
 	});
 
-	it('refreshGlobalFeed parses headers JSON from additionalFields', async () => {
+	it('refreshGlobalFeed maps the headers fixedCollection to an array of {name,value}', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				broadcast_id: 'bcast_13',
 				url: 'https://feed.example.com/data.json',
 				additionalFields: {
-					headers: '[{"name":"Authorization","value":"Bearer token"}]',
+					headers: { header: [{ name: 'Authorization', value: 'Bearer token' }] },
 				},
 			},
 		});
@@ -384,14 +403,14 @@ describe('Notifuse Broadcast resource', () => {
 		});
 	});
 
-	it('testRecipientFeed includes optional contact_email and parses headers JSON', async () => {
+	it('testRecipientFeed includes optional contact_email and maps the headers collection', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				broadcast_id: 'bcast_15',
 				url: 'https://feed.example.com/recipient.json',
 				additionalFields: {
 					contact_email: 'contact@example.com',
-					headers: '[{"name":"X-Api-Key","value":"secret"}]',
+					headers: { header: [{ name: 'X-Api-Key', value: 'secret' }] },
 				},
 			},
 		});

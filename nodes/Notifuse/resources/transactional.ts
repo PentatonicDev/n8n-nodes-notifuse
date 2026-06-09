@@ -1,11 +1,17 @@
 import { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { notifuseApiRequest } from '../GenericFunctions';
+import { keyValueProperty, keyValueToObject, notifuseApiRequest } from '../GenericFunctions';
 
 /**
  * Transactional resource — send a transactional notification to a contact.
  *
  * Endpoint: POST /api/transactional.send
+ *
+ * Field UX mirrors the n8n AWS SES "Send Template" action: Template Data and
+ * Metadata are entered as key/value rows (the node builds the JSON), recipient
+ * email is a single field, and Cc/Bcc are multi-value email lists.
  */
+
+const SEND = { show: { resource: ['transactional'], operation: ['send'] } };
 
 export const transactionalOperations: INodeProperties[] = [
 	{
@@ -27,7 +33,6 @@ export const transactionalOperations: INodeProperties[] = [
 ];
 
 export const transactionalFields: INodeProperties[] = [
-	// ---------- send — required fields ----------
 	{
 		displayName: 'Notification ID',
 		name: 'notificationId',
@@ -50,15 +55,91 @@ export const transactionalFields: INodeProperties[] = [
 	{
 		displayName: 'Channels',
 		name: 'channels',
-		type: 'string',
+		type: 'multiOptions',
 		required: true,
-		default: 'email',
-		placeholder: 'email',
+		default: ['email'],
+		options: [{ name: 'Email', value: 'email' }],
 		displayOptions: { show: { resource: ['transactional'], operation: ['send'] } },
-		description: 'Comma-separated list of channels to send through (e.g. email)',
+		description: 'Channels to send the notification through',
 	},
-
-	// ---------- send — additional fields ----------
+	keyValueProperty({
+		name: 'templateData',
+		displayName: 'Template Data',
+		placeholder: 'Add Data',
+		description: 'Key/value pairs passed to the template (built into the notification data object)',
+		displayOptions: SEND,
+	}),
+	{
+		displayName: 'Email Options',
+		name: 'emailOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: { resource: ['transactional'], operation: ['send'] } },
+		options: [
+			{
+				displayName: 'Bcc Addresses',
+				name: 'bcc',
+				type: 'string',
+				typeOptions: { multipleValues: true, multipleValueButtonText: 'Add Bcc Email' },
+				default: [],
+				placeholder: 'name@example.com',
+				description: 'Bcc recipients of the email',
+			},
+			{
+				displayName: 'Cc Addresses',
+				name: 'cc',
+				type: 'string',
+				typeOptions: { multipleValues: true, multipleValueButtonText: 'Add Cc Email' },
+				default: [],
+				placeholder: 'name@example.com',
+				description: 'Cc recipients of the email',
+			},
+			{
+				displayName: 'From Name',
+				name: 'from_name',
+				type: 'string',
+				default: '',
+				description: 'Override the default sender from name',
+			},
+			{
+				displayName: 'Reply To',
+				name: 'reply_to',
+				type: 'string',
+				default: '',
+				placeholder: 'name@example.com',
+				description: 'Reply-To email address',
+			},
+			{
+				displayName: 'Subject',
+				name: 'subject',
+				type: 'string',
+				default: '',
+				description: 'Override the template subject line (supports Liquid)',
+			},
+			{
+				displayName: 'Subject Preview',
+				name: 'subject_preview',
+				type: 'string',
+				default: '',
+				description: 'Override the preheader/preview text (supports Liquid)',
+			},
+			{
+				displayName: 'Attachments (JSON)',
+				name: 'attachments',
+				type: 'json',
+				default: '[]',
+				description: 'Email attachments (max 20 files, 3MB each, 10MB total)',
+			},
+		],
+	},
+	keyValueProperty({
+		name: 'metadata',
+		displayName: 'Metadata',
+		placeholder: 'Add Metadata',
+		description: 'Key/value metadata stored with the notification for tracking',
+		displayOptions: SEND,
+	}),
 	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
@@ -74,81 +155,18 @@ export const transactionalFields: INodeProperties[] = [
 				default: '',
 				description: 'External ID for idempotency checks',
 			},
-			{
-				displayName: 'Data (JSON)',
-				name: 'data',
-				type: 'json',
-				default: '{}',
-				description: 'Data object to populate the template with',
-			},
-			{
-				displayName: 'Metadata (JSON)',
-				name: 'metadata',
-				type: 'json',
-				default: '{}',
-				description: 'Additional metadata object for tracking',
-			},
-			{
-				displayName: 'Email Options (JSON)',
-				name: 'email_options',
-				type: 'json',
-				default: '{}',
-				description:
-					'Email-specific overrides: from_name, subject, subject_preview, cc, bcc, reply_to, attachments',
-			},
-			// Optional contact attributes
-			{
-				displayName: 'Contact External ID',
-				name: 'contact_external_id',
-				type: 'string',
-				default: '',
-				description: 'External identifier for the contact',
-			},
-			{
-				displayName: 'First Name',
-				name: 'first_name',
-				type: 'string',
-				default: '',
-				description: 'First name of the contact',
-			},
-			{
-				displayName: 'Last Name',
-				name: 'last_name',
-				type: 'string',
-				default: '',
-				description: 'Last name of the contact',
-			},
-			{
-				displayName: 'Full Name',
-				name: 'full_name',
-				type: 'string',
-				default: '',
-				description: 'Full name of the contact',
-			},
-			{
-				displayName: 'Phone',
-				name: 'phone',
-				type: 'string',
-				default: '',
-				description: 'Phone number of the contact',
-			},
-			{
-				displayName: 'Language',
-				name: 'language',
-				type: 'string',
-				default: '',
-				description: 'Preferred language of the contact',
-			},
-			{
-				displayName: 'Timezone',
-				name: 'timezone',
-				type: 'string',
-				default: '',
-				description: 'Timezone of the contact',
-			},
+			{ displayName: 'Contact External ID', name: 'contact_external_id', type: 'string', default: '' },
+			{ displayName: 'First Name', name: 'first_name', type: 'string', default: '' },
+			{ displayName: 'Last Name', name: 'last_name', type: 'string', default: '' },
+			{ displayName: 'Full Name', name: 'full_name', type: 'string', default: '' },
+			{ displayName: 'Phone', name: 'phone', type: 'string', default: '' },
+			{ displayName: 'Language', name: 'language', type: 'string', default: '' },
+			{ displayName: 'Timezone', name: 'timezone', type: 'string', default: '' },
 		],
 	},
 ];
+
+const CONTACT_KEYS = ['first_name', 'last_name', 'full_name', 'phone', 'language', 'timezone'];
 
 export async function executeTransactional(
 	this: IExecuteFunctions,
@@ -158,63 +176,45 @@ export async function executeTransactional(
 	if (operation === 'send') {
 		const notificationId = this.getNodeParameter('notificationId', i) as string;
 		const contactEmail = this.getNodeParameter('contactEmail', i) as string;
-		const channelsRaw = this.getNodeParameter('channels', i) as string;
+		const channels = this.getNodeParameter('channels', i, ['email']) as string[];
+		const templateData = this.getNodeParameter('templateData', i, {}) as IDataObject;
+		const metadata = this.getNodeParameter('metadata', i, {}) as IDataObject;
+		const emailOptions = this.getNodeParameter('emailOptions', i, {}) as IDataObject;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
-		// Build the contact object — start with required email then merge optional attrs
 		const contact: IDataObject = { email: contactEmail };
-		const contactOptionalKeys = [
-			'contact_external_id',
-			'first_name',
-			'last_name',
-			'full_name',
-			'phone',
-			'language',
-			'timezone',
-		];
-		for (const key of contactOptionalKeys) {
-			if (additionalFields[key]) {
-				const fieldName = key === 'contact_external_id' ? 'external_id' : key;
-				contact[fieldName] = additionalFields[key];
-			}
+		if (additionalFields.contact_external_id) {
+			contact.external_id = additionalFields.contact_external_id;
+		}
+		for (const key of CONTACT_KEYS) {
+			if (additionalFields[key]) contact[key] = additionalFields[key];
 		}
 
-		// Build the notification object — required fields first
-		const notification: IDataObject = {
-			id: notificationId,
-			contact,
-			channels: channelsRaw
-				.split(',')
-				.map((c) => c.trim())
-				.filter(Boolean),
-		};
+		const notification: IDataObject = { id: notificationId, contact, channels };
 
-		// Optional notification-level fields
-		if (additionalFields.external_id) {
-			notification.external_id = additionalFields.external_id;
-		}
-		if (additionalFields.data) {
-			notification.data =
-				typeof additionalFields.data === 'string'
-					? JSON.parse(additionalFields.data)
-					: additionalFields.data;
-		}
-		if (additionalFields.metadata) {
-			notification.metadata =
-				typeof additionalFields.metadata === 'string'
-					? JSON.parse(additionalFields.metadata)
-					: additionalFields.metadata;
-		}
-		if (additionalFields.email_options) {
-			notification.email_options =
-				typeof additionalFields.email_options === 'string'
-					? JSON.parse(additionalFields.email_options)
-					: additionalFields.email_options;
-		}
+		const data = keyValueToObject(templateData);
+		if (Object.keys(data).length) notification.data = data;
 
-		return await notifuseApiRequest.call(this, 'POST', '/api/transactional.send', {
-			notification,
-		});
+		const meta = keyValueToObject(metadata);
+		if (Object.keys(meta).length) notification.metadata = meta;
+
+		if (additionalFields.external_id) notification.external_id = additionalFields.external_id;
+
+		const emailOpts: IDataObject = {};
+		for (const key of ['from_name', 'subject', 'subject_preview', 'reply_to']) {
+			if (emailOptions[key]) emailOpts[key] = emailOptions[key];
+		}
+		const cc = (emailOptions.cc as string[]) ?? [];
+		const bcc = (emailOptions.bcc as string[]) ?? [];
+		if (cc.length) emailOpts.cc = cc;
+		if (bcc.length) emailOpts.bcc = bcc;
+		if (emailOptions.attachments) {
+			const raw = emailOptions.attachments;
+			emailOpts.attachments = typeof raw === 'string' ? JSON.parse(raw) : raw;
+		}
+		if (Object.keys(emailOpts).length) notification.email_options = emailOpts;
+
+		return await notifuseApiRequest.call(this, 'POST', '/api/transactional.send', { notification });
 	}
 
 	return {};

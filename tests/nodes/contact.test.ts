@@ -6,7 +6,8 @@ describe('Notifuse Contact resource', () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				email: 'jane@example.com',
-				additionalFields: { first_name: 'Jane', customFieldsJson: '{"custom_string_1":"vip"}' },
+				additionalFields: { first_name: 'Jane' },
+				customFields: { values: [{ key: 'custom_string_1', value: 'vip' }] },
 			},
 			apiResponse: { contact: { email: 'jane@example.com' } },
 		});
@@ -105,11 +106,11 @@ describe('Notifuse Contact resource', () => {
 		expect(req.body).toMatchObject({ email: 'gone@example.com', workspace_id: 'ws_test' });
 	});
 
-	it('import parses the contacts JSON and splits subscribe_to_lists', async () => {
+	it('import parses the contacts JSON and sends subscribe_to_lists as array', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				contacts: '[{"email":"a@x.com"}]',
-				subscribe_to_lists: 'list_1, list_2',
+				subscribe_to_lists: ['list_1', 'list_2'],
 			},
 		});
 

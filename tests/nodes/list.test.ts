@@ -2,11 +2,11 @@ import { executeList } from '../../nodes/Notifuse/resources/list';
 import { createExecuteFunctionsMock, firstAuthRequest } from '../helpers';
 
 describe('Notifuse List resource', () => {
-	it('subscribe builds the contact object, splits list_ids, and injects workspace_id', async () => {
+	it('subscribe sends list_ids as an array and injects workspace_id', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				email: 'jane@example.com',
-				list_ids: 'list_1, list_2, list_3',
+				list_ids: ['list_1', 'list_2', 'list_3'],
 				additionalFields: { first_name: 'Jane', phone: '123456789' },
 			},
 		});
@@ -27,11 +27,11 @@ describe('Notifuse List resource', () => {
 		});
 	});
 
-	it('subscribePublic builds the contact object and sends to public endpoint', async () => {
+	it('subscribePublic sends list_ids as an array to public endpoint', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				email: 'john@example.com',
-				list_ids: 'public_list_1, public_list_2',
+				list_ids: ['public_list_1', 'public_list_2'],
 				additionalFields: { external_id: 'ext-123' },
 			},
 		});

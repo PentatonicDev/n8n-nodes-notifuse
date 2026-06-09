@@ -1,19 +1,28 @@
-import { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
-import { notifuseApiRequest } from '../GenericFunctions';
+import { IDataObject, IDisplayOptions, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
+import { keyValueProperty, keyValueToObject, notifuseApiRequest } from '../GenericFunctions';
 
 /**
  * Broadcast resource module.
  *
- * Follows the contact.ts golden reference shape:
+ * Follows the contact.ts / transactional.ts golden references:
  *   - `broadcastOperations`: the Operation dropdown (shown only for this resource).
  *   - `broadcastFields`: all parameters, each gated by `displayOptions` on
  *     resource + operation. Required API fields are real required node fields;
- *     optional API fields live inside an "Additional Fields" collection. Deeply
- *     nested object/array bodies are exposed as `json` fields and parsed before sending.
+ *     optional API fields live inside an "Additional Fields" collection.
+ *   - Friendly structured inputs replace raw JSON where the schema is small and
+ *     stable: the required `audience` is exposed as individual node fields,
+ *     `utm_parameters` as a `collection`, `metadata` as key/value rows, and the
+ *     feed `headers` arrays as a `name`/`value` fixedCollection.
+ *   - Genuinely deep/variable trees (`test_settings` with its variations array,
+ *     `data_feed` with nested global/recipient feeds, the update `schedule`
+ *     object) stay as `json` fields parsed before sending.
  *   - `executeBroadcast(operation, i)`: routes one item to the Notifuse API.
  *
  * Endpoints: see NOTIFUSE_API_REFERENCE.md (broadcasts.*).
  */
+
+const CREATE = { show: { resource: ['broadcast'], operation: ['create'] } };
+const UPDATE = { show: { resource: ['broadcast'], operation: ['update'] } };
 
 export const broadcastOperations: INodeProperties[] = [
 	{
@@ -112,6 +121,49 @@ export const broadcastOperations: INodeProperties[] = [
 	},
 ];
 
+/** UTM parameters collection — small, stable scalar schema. */
+function utmParametersProperty(displayOptions: IDisplayOptions): INodeProperties {
+	return {
+		displayName: 'UTM Parameters',
+		name: 'utm_parameters',
+		type: 'collection',
+		placeholder: 'Add UTM Parameter',
+		default: {},
+		displayOptions,
+		options: [
+			{ displayName: 'Campaign', name: 'campaign', type: 'string', default: '', description: 'UTM campaign parameter' },
+			{ displayName: 'Content', name: 'content', type: 'string', default: '', description: 'UTM content parameter' },
+			{ displayName: 'Medium', name: 'medium', type: 'string', default: '', description: 'UTM medium parameter' },
+			{ displayName: 'Source', name: 'source', type: 'string', default: '', description: 'UTM source parameter' },
+			{ displayName: 'Term', name: 'term', type: 'string', default: '', description: 'UTM term parameter' },
+		],
+	};
+}
+
+/** Custom request headers as an array of { name, value } objects. */
+function headersProperty(displayOptions: IDisplayOptions): INodeProperties {
+	return {
+		displayName: 'Headers',
+		name: 'headers',
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: 'Add Header',
+		default: {},
+		displayOptions,
+		description: 'Optional custom HTTP headers to send with the request',
+		options: [
+			{
+				name: 'header',
+				displayName: 'Header',
+				values: [
+					{ displayName: 'Name', name: 'name', type: 'string', default: '', description: 'HTTP header name' },
+					{ displayName: 'Value', name: 'value', type: 'string', default: '', description: 'HTTP header value' },
+				],
+			},
+		],
+	};
+}
+
 export const broadcastFields: INodeProperties[] = [
 	// ---------- getAll ----------
 	{
@@ -195,18 +247,35 @@ export const broadcastFields: INodeProperties[] = [
 		type: 'string',
 		required: true,
 		default: '',
-		displayOptions: { show: { resource: ['broadcast'], operation: ['create'] } },
+		displayOptions: CREATE,
 		description: 'Name of the broadcast',
 	},
+	// audience (REQUIRED) — exposed as individual fields, assembled in execute.
 	{
-		displayName: 'Audience (JSON)',
-		name: 'audience',
-		type: 'json',
+		displayName: 'Audience List ID',
+		name: 'audienceList',
+		type: 'string',
 		required: true,
-		default: '{\n\t"list": ""\n}',
-		displayOptions: { show: { resource: ['broadcast'], operation: ['create'] } },
-		description:
-			'Audience settings: list (required), segments (array), exclude_unsubscribed (boolean)',
+		default: '',
+		displayOptions: CREATE,
+		description: 'ID of the list to send the broadcast to',
+	},
+	{
+		displayName: 'Audience Segments',
+		name: 'audienceSegments',
+		type: 'string',
+		typeOptions: { multipleValues: true, multipleValueButtonText: 'Add Segment' },
+		default: [],
+		displayOptions: CREATE,
+		description: 'Optional segment IDs to further filter recipients',
+	},
+	{
+		displayName: 'Exclude Unsubscribed',
+		name: 'audienceExcludeUnsubscribed',
+		type: 'boolean',
+		default: false,
+		displayOptions: CREATE,
+		description: 'Whether to exclude unsubscribed contacts from the audience',
 	},
 	{
 		displayName: 'Additional Fields',
@@ -214,8 +283,15 @@ export const broadcastFields: INodeProperties[] = [
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: { show: { resource: ['broadcast'], operation: ['create'] } },
+		displayOptions: CREATE,
 		options: [
+			{
+				displayName: 'Data Feed (JSON)',
+				name: 'data_feed',
+				type: 'json',
+				default: '{}',
+				description: 'Data feed settings (global_feed, recipient_feed)',
+			},
 			{
 				displayName: 'Test Settings (JSON)',
 				name: 'test_settings',
@@ -230,29 +306,16 @@ export const broadcastFields: INodeProperties[] = [
 				default: false,
 				description: 'Whether to enable click and open tracking',
 			},
-			{
-				displayName: 'UTM Parameters (JSON)',
-				name: 'utm_parameters',
-				type: 'json',
-				default: '{}',
-				description: 'UTM parameters: source, medium, campaign, term, content',
-			},
-			{
-				displayName: 'Data Feed (JSON)',
-				name: 'data_feed',
-				type: 'json',
-				default: '{}',
-				description: 'Data feed settings (global_feed, recipient_feed)',
-			},
-			{
-				displayName: 'Metadata (JSON)',
-				name: 'metadata',
-				type: 'json',
-				default: '{}',
-				description: 'Custom metadata for the broadcast',
-			},
 		],
 	},
+	utmParametersProperty(CREATE),
+	keyValueProperty({
+		name: 'metadata',
+		displayName: 'Metadata',
+		placeholder: 'Add Metadata',
+		description: 'Key/value custom metadata stored with the broadcast',
+		displayOptions: CREATE,
+	}),
 
 	// ---------- update ----------
 	{
@@ -261,7 +324,7 @@ export const broadcastFields: INodeProperties[] = [
 		type: 'string',
 		required: true,
 		default: '',
-		displayOptions: { show: { resource: ['broadcast'], operation: ['update'] } },
+		displayOptions: UPDATE,
 		description: 'ID of the broadcast to update',
 	},
 	{
@@ -270,18 +333,34 @@ export const broadcastFields: INodeProperties[] = [
 		type: 'string',
 		required: true,
 		default: '',
-		displayOptions: { show: { resource: ['broadcast'], operation: ['update'] } },
+		displayOptions: UPDATE,
 		description: 'Name of the broadcast',
 	},
 	{
-		displayName: 'Audience (JSON)',
-		name: 'audience',
-		type: 'json',
+		displayName: 'Audience List ID',
+		name: 'audienceList',
+		type: 'string',
 		required: true,
-		default: '{\n\t"list": ""\n}',
-		displayOptions: { show: { resource: ['broadcast'], operation: ['update'] } },
-		description:
-			'Audience settings: list (required), segments (array), exclude_unsubscribed (boolean)',
+		default: '',
+		displayOptions: UPDATE,
+		description: 'ID of the list to send the broadcast to',
+	},
+	{
+		displayName: 'Audience Segments',
+		name: 'audienceSegments',
+		type: 'string',
+		typeOptions: { multipleValues: true, multipleValueButtonText: 'Add Segment' },
+		default: [],
+		displayOptions: UPDATE,
+		description: 'Optional segment IDs to further filter recipients',
+	},
+	{
+		displayName: 'Exclude Unsubscribed',
+		name: 'audienceExcludeUnsubscribed',
+		type: 'boolean',
+		default: false,
+		displayOptions: UPDATE,
+		description: 'Whether to exclude unsubscribed contacts from the audience',
 	},
 	{
 		displayName: 'Additional Fields',
@@ -289,8 +368,15 @@ export const broadcastFields: INodeProperties[] = [
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: { show: { resource: ['broadcast'], operation: ['update'] } },
+		displayOptions: UPDATE,
 		options: [
+			{
+				displayName: 'Data Feed (JSON)',
+				name: 'data_feed',
+				type: 'json',
+				default: '{}',
+				description: 'Data feed settings (global_feed, recipient_feed)',
+			},
 			{
 				displayName: 'Schedule (JSON)',
 				name: 'schedule',
@@ -313,29 +399,16 @@ export const broadcastFields: INodeProperties[] = [
 				default: false,
 				description: 'Whether to enable click and open tracking',
 			},
-			{
-				displayName: 'UTM Parameters (JSON)',
-				name: 'utm_parameters',
-				type: 'json',
-				default: '{}',
-				description: 'UTM parameters: source, medium, campaign, term, content',
-			},
-			{
-				displayName: 'Data Feed (JSON)',
-				name: 'data_feed',
-				type: 'json',
-				default: '{}',
-				description: 'Data feed settings (global_feed, recipient_feed)',
-			},
-			{
-				displayName: 'Metadata (JSON)',
-				name: 'metadata',
-				type: 'json',
-				default: '{}',
-				description: 'Custom metadata for the broadcast',
-			},
 		],
 	},
+	utmParametersProperty(UPDATE),
+	keyValueProperty({
+		name: 'metadata',
+		displayName: 'Metadata',
+		placeholder: 'Add Metadata',
+		description: 'Key/value custom metadata stored with the broadcast',
+		displayOptions: UPDATE,
+	}),
 
 	// ---------- schedule ----------
 	{
@@ -534,16 +607,7 @@ export const broadcastFields: INodeProperties[] = [
 		placeholder: 'Add Field',
 		default: {},
 		displayOptions: { show: { resource: ['broadcast'], operation: ['refreshGlobalFeed'] } },
-		options: [
-			{
-				displayName: 'Headers (JSON)',
-				name: 'headers',
-				type: 'json',
-				default: '[]',
-				description:
-					'Optional custom headers to send with the request. Array of { name, value } objects.',
-			},
-		],
+		options: [headersProperty({ show: { resource: ['broadcast'], operation: ['refreshGlobalFeed'] } })],
 	},
 
 	// ---------- testRecipientFeed ----------
@@ -582,14 +646,7 @@ export const broadcastFields: INodeProperties[] = [
 				description:
 					'Optional email of a specific contact to test with. If not provided, uses a random contact.',
 			},
-			{
-				displayName: 'Headers (JSON)',
-				name: 'headers',
-				type: 'json',
-				default: '[]',
-				description:
-					'Optional custom headers to send with the request. Array of { name, value } objects.',
-			},
+			headersProperty({ show: { resource: ['broadcast'], operation: ['testRecipientFeed'] } }),
 		],
 	},
 ];
@@ -598,8 +655,41 @@ function parseJsonParam(value: unknown): IDataObject {
 	return (typeof value === 'string' ? JSON.parse(value) : value) as IDataObject;
 }
 
-function applyJsonFields(body: IDataObject, fields: IDataObject, jsonKeys: string[]): void {
-	for (const [key, value] of Object.entries(fields)) {
+/** Builds the required `audience` object from the individual node fields. */
+function buildAudience(this: IExecuteFunctions, i: number): IDataObject {
+	const audience: IDataObject = {
+		list: this.getNodeParameter('audienceList', i) as string,
+	};
+	const segments = this.getNodeParameter('audienceSegments', i, []) as string[];
+	if (segments.length) audience.segments = segments;
+	const excludeUnsubscribed = this.getNodeParameter('audienceExcludeUnsubscribed', i, false) as boolean;
+	if (excludeUnsubscribed) audience.exclude_unsubscribed = true;
+	return audience;
+}
+
+/** Maps a header fixedCollection ({ header: [{name,value}] }) to an array of {name,value}. */
+function headersToArray(collection: IDataObject | undefined): IDataObject[] {
+	const rows = (collection?.header as IDataObject[]) ?? [];
+	return rows
+		.filter((row) => row.name)
+		.map((row) => ({ name: row.name, value: row.value }));
+}
+
+/** Adds optional create/update fields (UTM, metadata, JSON trees, tracking) to the body. */
+function applyWriteOptions(
+	this: IExecuteFunctions,
+	i: number,
+	body: IDataObject,
+	additionalFields: IDataObject,
+	jsonKeys: string[],
+): void {
+	const utm = this.getNodeParameter('utm_parameters', i, {}) as IDataObject;
+	if (Object.keys(utm).length) body.utm_parameters = utm;
+
+	const metadata = keyValueToObject(this.getNodeParameter('metadata', i, {}) as IDataObject);
+	if (Object.keys(metadata).length) body.metadata = metadata;
+
+	for (const [key, value] of Object.entries(additionalFields)) {
 		if (jsonKeys.includes(key)) {
 			body[key] = parseJsonParam(value);
 		} else {
@@ -651,31 +741,20 @@ export async function executeBroadcast(
 
 	if (operation === 'create') {
 		const name = this.getNodeParameter('name', i) as string;
-		const audience = parseJsonParam(this.getNodeParameter('audience', i));
+		const audience = buildAudience.call(this, i);
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 		const body: IDataObject = { name, audience };
-		applyJsonFields(body, additionalFields, [
-			'test_settings',
-			'utm_parameters',
-			'data_feed',
-			'metadata',
-		]);
+		applyWriteOptions.call(this, i, body, additionalFields, ['test_settings', 'data_feed']);
 		return await notifuseApiRequest.call(this, 'POST', '/api/broadcasts.create', body);
 	}
 
 	if (operation === 'update') {
 		const id = this.getNodeParameter('id', i) as string;
 		const name = this.getNodeParameter('name', i) as string;
-		const audience = parseJsonParam(this.getNodeParameter('audience', i));
+		const audience = buildAudience.call(this, i);
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 		const body: IDataObject = { id, name, audience };
-		applyJsonFields(body, additionalFields, [
-			'schedule',
-			'test_settings',
-			'utm_parameters',
-			'data_feed',
-			'metadata',
-		]);
+		applyWriteOptions.call(this, i, body, additionalFields, ['schedule', 'test_settings', 'data_feed']);
 		return await notifuseApiRequest.call(this, 'POST', '/api/broadcasts.update', body);
 	}
 
@@ -737,7 +816,8 @@ export async function executeBroadcast(
 		const url = this.getNodeParameter('url', i) as string;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 		const body: IDataObject = { broadcast_id: broadcastId, url };
-		applyJsonFields(body, additionalFields, ['headers']);
+		const headers = headersToArray(additionalFields.headers as IDataObject);
+		if (headers.length) body.headers = headers;
 		return await notifuseApiRequest.call(this, 'POST', '/api/broadcasts.refreshGlobalFeed', body);
 	}
 
@@ -746,7 +826,9 @@ export async function executeBroadcast(
 		const url = this.getNodeParameter('url', i) as string;
 		const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 		const body: IDataObject = { broadcast_id: broadcastId, url };
-		applyJsonFields(body, additionalFields, ['headers']);
+		if (additionalFields.contact_email) body.contact_email = additionalFields.contact_email;
+		const headers = headersToArray(additionalFields.headers as IDataObject);
+		if (headers.length) body.headers = headers;
 		return await notifuseApiRequest.call(this, 'POST', '/api/broadcasts.testRecipientFeed', body);
 	}
 

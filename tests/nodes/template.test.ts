@@ -86,6 +86,7 @@ describe('Notifuse Template resource', () => {
 				name: 'Welcome Email',
 				channel: 'email',
 				category: 'welcome',
+				testData: {},
 				additionalFields: {},
 			},
 		});
@@ -111,6 +112,7 @@ describe('Notifuse Template resource', () => {
 				name: 'Promo',
 				channel: 'email',
 				category: 'marketing',
+				testData: {},
 				additionalFields: {
 					email: '{"subject":"Hello","sender_id":"sender_1"}',
 				},
@@ -132,6 +134,7 @@ describe('Notifuse Template resource', () => {
 				name: 'Promo',
 				channel: 'email',
 				category: 'marketing',
+				testData: {},
 				additionalFields: { email: '{}' },
 			},
 		});
@@ -149,6 +152,7 @@ describe('Notifuse Template resource', () => {
 				name: 'Promo',
 				channel: 'email',
 				category: 'marketing',
+				testData: {},
 				additionalFields: { email: {} },
 			},
 		});
@@ -159,16 +163,54 @@ describe('Notifuse Template resource', () => {
 		expect(req.body).not.toHaveProperty('email');
 	});
 
-	it('create parses web, test_data, settings and sets template_macro_id', async () => {
+	it('create sends test_data from key/value rows', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				id: 'promo',
+				name: 'Promo',
+				channel: 'email',
+				category: 'marketing',
+				testData: { values: [{ key: 'name', value: 'Alice' }, { key: 'product', value: 'Acme' }] },
+				additionalFields: {},
+			},
+		});
+
+		await executeTemplate.call(ctx, 'create', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body).toMatchObject({
+			test_data: { name: 'Alice', product: 'Acme' },
+		});
+	});
+
+	it('create does NOT add test_data when rows are empty', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				id: 'promo',
+				name: 'Promo',
+				channel: 'email',
+				category: 'marketing',
+				testData: {},
+				additionalFields: {},
+			},
+		});
+
+		await executeTemplate.call(ctx, 'create', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body).not.toHaveProperty('test_data');
+	});
+
+	it('create parses web, settings and sets template_macro_id', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				id: 'web_tpl',
 				name: 'Web Template',
 				channel: 'web',
 				category: 'other',
+				testData: {},
 				additionalFields: {
 					web: '{"content":{"type":"doc"}}',
-					test_data: '{"name":"Alice"}',
 					settings: '{"key":"val"}',
 					template_macro_id: 'macro_99',
 				},
@@ -180,22 +222,21 @@ describe('Notifuse Template resource', () => {
 		const req = firstAuthRequest(httpRequestWithAuthentication);
 		expect(req.body).toMatchObject({
 			web: { content: { type: 'doc' } },
-			test_data: { name: 'Alice' },
 			settings: { key: 'val' },
 			template_macro_id: 'macro_99',
 		});
 	});
 
-	it('create does NOT add web/test_data/settings when they are empty', async () => {
+	it('create does NOT add web/settings when they are empty', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				id: 'tpl',
 				name: 'Tpl',
 				channel: 'web',
 				category: 'other',
+				testData: {},
 				additionalFields: {
 					web: '{}',
-					test_data: '{}',
 					settings: '{}',
 				},
 			},
@@ -205,7 +246,6 @@ describe('Notifuse Template resource', () => {
 
 		const req = firstAuthRequest(httpRequestWithAuthentication);
 		expect(req.body).not.toHaveProperty('web');
-		expect(req.body).not.toHaveProperty('test_data');
 		expect(req.body).not.toHaveProperty('settings');
 	});
 
@@ -218,6 +258,7 @@ describe('Notifuse Template resource', () => {
 				name: 'Updated Name',
 				channel: 'email',
 				category: 'transactional',
+				testData: {},
 				additionalFields: {},
 			},
 		});
@@ -243,6 +284,7 @@ describe('Notifuse Template resource', () => {
 				name: 'My Tpl',
 				channel: 'email',
 				category: 'transactional',
+				testData: {},
 				additionalFields: {
 					email: '{"subject":"Updated Subject"}',
 				},
@@ -262,6 +304,7 @@ describe('Notifuse Template resource', () => {
 				name: 'My Tpl',
 				channel: 'email',
 				category: 'transactional',
+				testData: {},
 				additionalFields: { email: '{}' },
 			},
 		});
@@ -279,6 +322,7 @@ describe('Notifuse Template resource', () => {
 				name: 'My Tpl',
 				channel: 'email',
 				category: 'transactional',
+				testData: {},
 				additionalFields: { template_macro_id: 'macro_42' },
 			},
 		});
@@ -287,6 +331,42 @@ describe('Notifuse Template resource', () => {
 
 		const req = firstAuthRequest(httpRequestWithAuthentication);
 		expect(req.body).toMatchObject({ template_macro_id: 'macro_42' });
+	});
+
+	it('update sends test_data from key/value rows', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				id: 'tpl_abc',
+				name: 'My Tpl',
+				channel: 'email',
+				category: 'transactional',
+				testData: { values: [{ key: 'greeting', value: 'Hello' }] },
+				additionalFields: {},
+			},
+		});
+
+		await executeTemplate.call(ctx, 'update', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body).toMatchObject({ test_data: { greeting: 'Hello' } });
+	});
+
+	it('update does NOT add test_data when rows are empty', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				id: 'tpl_abc',
+				name: 'My Tpl',
+				channel: 'email',
+				category: 'transactional',
+				testData: {},
+				additionalFields: {},
+			},
+		});
+
+		await executeTemplate.call(ctx, 'update', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body).not.toHaveProperty('test_data');
 	});
 
 	// ── delete ────────────────────────────────────────────────────────────────
@@ -312,6 +392,8 @@ describe('Notifuse Template resource', () => {
 			params: {
 				message_id: 'msg_001',
 				visual_editor_tree: JSON.stringify(tree),
+				testData: {},
+				trackingSettings: {},
 				additionalFields: {},
 			},
 		});
@@ -334,6 +416,8 @@ describe('Notifuse Template resource', () => {
 			params: {
 				message_id: 'msg_002',
 				visual_editor_tree: tree,
+				testData: {},
+				trackingSettings: {},
 				additionalFields: {},
 			},
 		});
@@ -349,6 +433,8 @@ describe('Notifuse Template resource', () => {
 			params: {
 				message_id: 'msg_003',
 				visual_editor_tree: '{"type":"mjml"}',
+				testData: {},
+				trackingSettings: {},
 				additionalFields: {
 					subject: 'Hello {{name}}',
 					subject_preview: 'Preview text',
@@ -370,6 +456,8 @@ describe('Notifuse Template resource', () => {
 			params: {
 				message_id: 'msg_004',
 				visual_editor_tree: '{"type":"mjml"}',
+				testData: {},
+				trackingSettings: {},
 				additionalFields: { channel: 'email' },
 			},
 		});
@@ -380,12 +468,14 @@ describe('Notifuse Template resource', () => {
 		expect(req.body).toMatchObject({ channel: 'email' });
 	});
 
-	it('compile parses test_data when non-empty', async () => {
+	it('compile sends test_data from key/value rows', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				message_id: 'msg_005',
 				visual_editor_tree: '{"type":"mjml"}',
-				additionalFields: { test_data: '{"user":"Bob"}' },
+				testData: { values: [{ key: 'user', value: 'Bob' }] },
+				trackingSettings: {},
+				additionalFields: {},
 			},
 		});
 
@@ -395,12 +485,14 @@ describe('Notifuse Template resource', () => {
 		expect(req.body).toMatchObject({ test_data: { user: 'Bob' } });
 	});
 
-	it('compile does NOT include test_data when json is empty object string', async () => {
+	it('compile does NOT include test_data when rows are empty', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				message_id: 'msg_006',
 				visual_editor_tree: '{"type":"mjml"}',
-				additionalFields: { test_data: '{}' },
+				testData: {},
+				trackingSettings: {},
+				additionalFields: {},
 			},
 		});
 
@@ -410,14 +502,19 @@ describe('Notifuse Template resource', () => {
 		expect(req.body).not.toHaveProperty('test_data');
 	});
 
-	it('compile parses tracking_settings when non-empty', async () => {
+	it('compile builds tracking_settings from structured collection fields', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				message_id: 'msg_007',
 				visual_editor_tree: '{"type":"mjml"}',
-				additionalFields: {
-					tracking_settings: '{"enable_tracking":true,"utm_source":"newsletter"}',
+				testData: {},
+				trackingSettings: {
+					enable_tracking: true,
+					utm_source: 'newsletter',
+					utm_medium: 'email',
+					utm_campaign: 'summer_sale',
 				},
+				additionalFields: {},
 			},
 		});
 
@@ -425,16 +522,58 @@ describe('Notifuse Template resource', () => {
 
 		const req = firstAuthRequest(httpRequestWithAuthentication);
 		expect(req.body).toMatchObject({
-			tracking_settings: { enable_tracking: true, utm_source: 'newsletter' },
+			tracking_settings: {
+				enable_tracking: true,
+				utm_source: 'newsletter',
+				utm_medium: 'email',
+				utm_campaign: 'summer_sale',
+			},
 		});
 	});
 
-	it('compile does NOT include tracking_settings when json is empty object string', async () => {
+	it('compile includes all tracking UTM fields when provided', async () => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: {
+				message_id: 'msg_007b',
+				visual_editor_tree: '{"type":"mjml"}',
+				testData: {},
+				trackingSettings: {
+					enable_tracking: true,
+					endpoint: 'https://track.example.com',
+					utm_source: 'src',
+					utm_medium: 'med',
+					utm_campaign: 'camp',
+					utm_content: 'cnt',
+					utm_term: 'trm',
+				},
+				additionalFields: {},
+			},
+		});
+
+		await executeTemplate.call(ctx, 'compile', 0);
+
+		const req = firstAuthRequest(httpRequestWithAuthentication);
+		expect(req.body).toMatchObject({
+			tracking_settings: {
+				enable_tracking: true,
+				endpoint: 'https://track.example.com',
+				utm_source: 'src',
+				utm_medium: 'med',
+				utm_campaign: 'camp',
+				utm_content: 'cnt',
+				utm_term: 'trm',
+			},
+		});
+	});
+
+	it('compile does NOT include tracking_settings when collection is empty', async () => {
 		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
 			params: {
 				message_id: 'msg_008',
 				visual_editor_tree: '{"type":"mjml"}',
-				additionalFields: { tracking_settings: '{}' },
+				testData: {},
+				trackingSettings: {},
+				additionalFields: {},
 			},
 		});
 
