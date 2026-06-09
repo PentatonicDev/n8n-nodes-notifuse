@@ -18,7 +18,7 @@ export class NotifuseApi implements ICredentialType {
 			type: 'string',
 			default: '',
 			required: true,
-			placeholder: 'https://notifuse.pentatonic.cloud',
+			placeholder: 'https://notifuse.example.com',
 			description:
 				'The base URL of your Notifuse instance (without a trailing slash). Each environment can use its own URL and token.',
 		},
@@ -39,7 +39,6 @@ export class NotifuseApi implements ICredentialType {
 			type: 'string',
 			default: '',
 			required: true,
-			placeholder: 'ws_1234567890',
 			description: 'The workspace this credential is scoped to. Sent as workspace_id on every request.',
 		},
 	];

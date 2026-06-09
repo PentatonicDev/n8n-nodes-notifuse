@@ -22,12 +22,15 @@ nodes/Notifuse/
   shared/triggerFunctions.ts             TRIGGER_RESOURCES + buildNotifuseTriggerDescription +
                                           shared webhook handler + self-registration lifecycle +
                                           Standard Webhooks verify
-nodes/NotifuseTrigger/                    Single "Notifuse Trigger" node: one "Events"
-                                          multiOptions with all event types; named so n8n groups
-                                          it under the "Notifuse" app (base name must match the
-                                          action node). n8n's creator only surfaces events from
-                                          the FIRST property named "Events" and has no Resource
-                                          split for triggers — so it must be a single flat field.
+nodes/NotifuseTrigger/                    Single "Notifuse Trigger" node: `resource` (entity) +
+                                          per-resource `operation` (multiOptions of events). Named
+                                          so n8n groups it under the "Notifuse" app, and the
+                                          resource+operation shape makes the creator render
+                                          per-entity event sections (resourceCategories). Caveat:
+                                          n8n labels those sections "… Actions" and adds one
+                                          generic "On new event" placeholder — cosmetic, no
+                                          triggers-specific grouping exists. getSelectedEvents
+                                          reads the `operation` param.
 ```
 
 `nodes/Notifuse/resources/contact.ts` is the **golden reference** for resource modules.

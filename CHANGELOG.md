@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-09
+
+### Fixed
+
+- **Credential icon now renders.** The gulp build only copied node icons, so
+  `dist/credentials/notifuse.svg` was never produced and n8n showed no credential icon.
+
+### Changed
+
+- **Trigger events are now grouped by entity in the nodes panel.** The trigger is structured as
+  `resource` (entity) + a per-resource `operation` (multiOptions of events), so n8n's node creator
+  renders per-entity sections (via `resourceCategories`). Note: n8n labels these sections
+  "… Actions" (no triggers variant) and adds one generic "On new event" entry — cosmetic n8n
+  limitations.
+- Credential **API URL** placeholder is now `https://notifuse.example.com`; the **Workspace ID**
+  field no longer shows a placeholder.
+
 ## [1.2.0] - 2026-06-09
 
 ### Changed

@@ -9,6 +9,7 @@ import {
 	notifuseTriggerWebhookMethods,
 	verifyStandardWebhookSignature,
 	TRIGGER_EVENTS,
+	TRIGGER_RESOURCES,
 } from '../../nodes/Notifuse/shared/triggerFunctions';
 import { NotifuseTrigger } from '../../nodes/NotifuseTrigger/NotifuseTrigger.node';
 import { DEFAULT_CREDENTIALS } from '../helpers';
@@ -92,13 +93,16 @@ describe('Notifuse Trigger node description', () => {
 		expect(node.description.credentials).toEqual([{ name: 'notifuseApi', required: true }]);
 	});
 
-	it('exposes a single Events field with all 23 event types', () => {
-		const eventsProps = node.description.properties.filter((p) => p.displayName === 'Events');
-		// Exactly one "Events" property, so n8n's node creator surfaces every event.
-		expect(eventsProps).toHaveLength(1);
-		expect(eventsProps[0].name).toBe('events');
-		expect(eventsProps[0].options).toHaveLength(23);
-		expect(eventsProps[0].options).toHaveLength(TRIGGER_EVENTS.length);
+	it('exposes a Resource dropdown and per-resource Events covering every event type', () => {
+		const resourceProp = node.description.properties.find((p) => p.name === 'resource');
+		const values = (resourceProp?.options as Array<{ value: string }>).map((o) => o.value);
+		expect(values).toEqual(['contact', 'list', 'segment', 'email', 'customEvent']);
+
+		const eventFields = node.description.properties.filter((p) => p.name === 'operation');
+		expect(eventFields).toHaveLength(TRIGGER_RESOURCES.length);
+		const total = eventFields.reduce((n, f) => n + ((f.options as unknown[])?.length ?? 0), 0);
+		expect(total).toBe(TRIGGER_EVENTS.length);
+		expect(total).toBe(23);
 	});
 });
 
@@ -110,7 +114,7 @@ describe('notifuseTriggerWebhook', () => {
 			body,
 			rawBody: raw,
 			headers: signedHeaders(raw),
-			params: { events: ['contact.created'], options: {}, verifySignature: true },
+			params: { operation: ['contact.created'], options: {}, verifySignature: true },
 			staticData: { webhookSecret: SECRET },
 		});
 
@@ -124,7 +128,7 @@ describe('notifuseTriggerWebhook', () => {
 		const { ctx, res } = createWebhookMock({
 			body,
 			headers: { 'webhook-id': 'x', 'webhook-timestamp': 't', 'webhook-signature': 'v1,bad' },
-			params: { events: ['contact.created'], options: {}, verifySignature: true },
+			params: { operation: ['contact.created'], options: {}, verifySignature: true },
 			staticData: { webhookSecret: SECRET },
 		});
 
@@ -138,7 +142,7 @@ describe('notifuseTriggerWebhook', () => {
 		const body = { type: 'contact.deleted' };
 		const { ctx, res } = createWebhookMock({
 			body,
-			params: { events: ['contact.created'], options: {}, verifySignature: false },
+			params: { operation: ['contact.created'], options: {}, verifySignature: false },
 		});
 
 		await notifuseTriggerWebhook.call(ctx);
@@ -171,7 +175,7 @@ function createHookMock(opts: {
 describe('trigger lifecycle (webhookMethods)', () => {
 	it('create registers a subscription with the selected resource events and stores id + secret', async () => {
 		const { ctx, httpRequestWithAuthentication, staticData } = createHookMock({
-			params: { events: ['email.opened', 'email.clicked'], subscriptionName: 'n8n - Notifuse' },
+			params: { operation: ['email.opened', 'email.clicked'], subscriptionName: 'n8n - Notifuse' },
 			apiResponse: { subscription: { id: 'whsub_1', secret: SECRET } },
 		});
 
@@ -191,7 +195,7 @@ describe('trigger lifecycle (webhookMethods)', () => {
 
 	it('checkExists returns false when the selected events changed', async () => {
 		const { ctx } = createHookMock({
-			params: { events: ['contact.created', 'contact.updated'] },
+			params: { operation: ['contact.created', 'contact.updated'] },
 			staticData: { webhookId: 'whsub_1' },
 			apiResponse: { subscription: { id: 'whsub_1', event_types: ['contact.created'] } },
 		});
@@ -202,7 +206,7 @@ describe('trigger lifecycle (webhookMethods)', () => {
 
 	it('checkExists returns true when events match', async () => {
 		const { ctx } = createHookMock({
-			params: { events: ['contact.created'] },
+			params: { operation: ['contact.created'] },
 			staticData: { webhookId: 'whsub_1' },
 			apiResponse: { subscription: { id: 'whsub_1', event_types: ['contact.created'] } },
 		});
