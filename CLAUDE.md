@@ -22,9 +22,12 @@ nodes/Notifuse/
   shared/triggerFunctions.ts             TRIGGER_RESOURCES + buildNotifuseTriggerDescription +
                                           shared webhook handler + self-registration lifecycle +
                                           Standard Webhooks verify
-nodes/NotifuseTrigger/                    Single "Notifuse Trigger" node: Resource (entity) +
-                                          per-resource Events; named so n8n groups it under the
-                                          "Notifuse" app (base name must match the action node)
+nodes/NotifuseTrigger/                    Single "Notifuse Trigger" node: one "Events"
+                                          multiOptions with all event types; named so n8n groups
+                                          it under the "Notifuse" app (base name must match the
+                                          action node). n8n's creator only surfaces events from
+                                          the FIRST property named "Events" and has no Resource
+                                          split for triggers — so it must be a single flat field.
 ```
 
 `nodes/Notifuse/resources/contact.ts` is the **golden reference** for resource modules.
@@ -34,8 +37,7 @@ endpoint reference generated from the OpenAPI spec (`https://docs.notifuse.com/o
 ## Hard rules
 
 - Never add or send `workspace_id` from a resource module — `notifuseApiRequest` injects it.
-- Make every HTTP call via `notifuseApiRequest` (the only exception is `user.rootSignin`,
-  which is public + HMAC and uses `this.helpers.httpRequest` directly).
+- Make every HTTP call via `notifuseApiRequest`.
 - Required API fields → required node fields gated on `resource` + `operation`.
   Optional fields → `Additional Fields` (writes) or `Filters` (list GETs) collections.
   Deeply nested objects/arrays → `json` fields parsed with

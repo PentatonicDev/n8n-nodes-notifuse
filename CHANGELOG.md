@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-09
+
+### Changed
+
+- **Notifuse Trigger now exposes all event types in a single `Events` field.** n8n's node creator
+  only surfaces events from the first property named "Events", so the previous per-resource event
+  fields meant only the Contact events showed up in the panel. Events are now one flat (but
+  entity-prefixed) list, so every event appears as its own selectable trigger under the Notifuse
+  app. (n8n only supports the Resource split for actions, not triggers.)
+
+### Removed
+
+- **User → Root Sign In** action. The HMAC root sign-in endpoint is an auth-bootstrap mechanism
+  (IaC/CI), not a workspace operation, and doesn't fit the per-workspace credential model.
+
 ## [1.1.0] - 2026-06-09
 
 ### Changed

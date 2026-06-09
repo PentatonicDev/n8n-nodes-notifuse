@@ -44,9 +44,9 @@ describe('Notifuse node', () => {
 				'list',
 				'template',
 				'transactional',
-				'user',
 			]),
 		);
+		expect(values).not.toContain('user');
 	});
 
 	it('is usable as a tool', () => {

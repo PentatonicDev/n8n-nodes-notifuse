@@ -22,7 +22,6 @@ import {
 	customEventFields,
 	executeCustomEvent,
 } from './resources/customEvent';
-import { userOperations, userFields, executeUser } from './resources/user';
 
 export class Notifuse implements INodeType {
 	description: INodeTypeDescription = {
@@ -57,7 +56,6 @@ export class Notifuse implements INodeType {
 					{ name: 'List', value: 'list' },
 					{ name: 'Template', value: 'template' },
 					{ name: 'Transactional', value: 'transactional' },
-					{ name: 'User', value: 'user' },
 				],
 				default: 'contact',
 			},
@@ -73,8 +71,6 @@ export class Notifuse implements INodeType {
 			...transactionalFields,
 			...customEventOperations,
 			...customEventFields,
-			...userOperations,
-			...userFields,
 		],
 		usableAsTool: true,
 	};
@@ -107,9 +103,6 @@ export class Notifuse implements INodeType {
 						break;
 					case 'customEvent':
 						responseData = await executeCustomEvent.call(this, operation, i);
-						break;
-					case 'user':
-						responseData = await executeUser.call(this, operation, i);
 						break;
 					default:
 						throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);

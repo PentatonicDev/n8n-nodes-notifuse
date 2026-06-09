@@ -64,16 +64,16 @@ Required API fields are exposed as required node fields; optional fields live un
 | **Template** | Create · Update · Get · Get Many · Delete · Compile |
 | **Transactional** | Send |
 | **Custom Event** | Import |
-| **User** | Root Sign In (HMAC) |
 
 ### Trigger node
 
-A single **Notifuse Trigger** node mirrors the action node: pick a **Resource** (entity), then
-the **Events** to listen for. It **self-registers a Notifuse webhook subscription** pointing at
-the n8n webhook URL — created when the workflow is activated, re-created when the selected events
-change, and deleted when the workflow is deactivated.
+A single **Notifuse Trigger** node exposes all webhook event types in one **Events** field
+(each entry is also selectable directly from the "Notifuse" app in the nodes panel). It
+**self-registers a Notifuse webhook subscription** pointing at the n8n webhook URL — created when
+the workflow is activated, re-created when the selected events change, and deleted when the
+workflow is deactivated.
 
-| Resource | Events |
+| Entity | Events |
 | --- | --- |
 | **Contact** | `contact.created`, `contact.updated`, `contact.deleted` |
 | **List** | `list.subscribed`, `list.unsubscribed`, `list.confirmed`, `list.resubscribed`, `list.bounced`, `list.complained`, `list.pending`, `list.removed` |
@@ -81,8 +81,8 @@ change, and deleted when the workflow is deactivated.
 | **Email** | `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`, `email.unsubscribed` |
 | **Custom Event** | `custom_event.created`, `custom_event.updated`, `custom_event.deleted` |
 
-Use one trigger node per entity you want to listen to. Each event is delivered to the workflow
-as a separate item with `{ id, type, timestamp, workspace_id, data }`.
+Select any number of events (across entities) in a single trigger node. Each event is delivered
+to the workflow as a separate item with `{ id, type, timestamp, workspace_id, data }`.
 
 ## Webhook security
 
