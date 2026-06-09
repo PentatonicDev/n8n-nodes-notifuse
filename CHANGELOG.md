@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-09
+
+### Changed
+
+- **Consolidated the five entity trigger nodes into a single `Notifuse Trigger` node** with a
+  Resource (entity) + Events selector, mirroring the action node. This makes the trigger appear
+  under the "Notifuse" app in the nodes panel (alongside the actions) instead of as separate
+  apps. Behaviour (self-registration, Standard Webhooks signature verification, security options)
+  is unchanged.
+
+### Removed
+
+- The separate `Notifuse Contact/List/Segment/Email/Custom Event Trigger` nodes (replaced by the
+  single `Notifuse Trigger`). Existing workflows using the old trigger nodes must switch to the
+  new node.
+
 ## [1.0.1] - 2026-06-08
 
 ### Changed

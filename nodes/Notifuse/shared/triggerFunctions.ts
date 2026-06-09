@@ -4,6 +4,7 @@ import {
 	IHookFunctions,
 	INodeExecutionData,
 	INodePropertyOptions,
+	INodeProperties,
 	INodeTypeDescription,
 	IWebhookFunctions,
 	IWebhookResponseData,
@@ -20,14 +21,76 @@ import {
 	webhookSecurityProperties,
 } from './webhookHelpers';
 
-export interface NotifuseTriggerConfig {
-	displayName: string;
+/**
+ * Event types grouped by entity. The single Notifuse Trigger node exposes a
+ * Resource (entity) selector plus a per-resource Events multiOptions field,
+ * mirroring the Resource + Operation pattern of the action node.
+ */
+export const TRIGGER_RESOURCES: Array<{
+	value: string;
 	name: string;
-	/** Entity label used in the default subscription name, e.g. "Contact". */
-	entity: string;
-	/** Event types selectable for this trigger (the entity's `entity.*` events). */
-	eventOptions: INodePropertyOptions[];
-}
+	eventsField: string;
+	events: INodePropertyOptions[];
+}> = [
+	{
+		value: 'contact',
+		name: 'Contact',
+		eventsField: 'contactEvents',
+		events: [
+			{ name: 'Contact Created', value: 'contact.created', description: 'A contact was created' },
+			{ name: 'Contact Updated', value: 'contact.updated', description: 'A contact was updated' },
+			{ name: 'Contact Deleted', value: 'contact.deleted', description: 'A contact was deleted' },
+		],
+	},
+	{
+		value: 'list',
+		name: 'List',
+		eventsField: 'listEvents',
+		events: [
+			{ name: 'List Bounced', value: 'list.bounced', description: 'A list email bounced' },
+			{ name: 'List Complained', value: 'list.complained', description: 'A spam complaint was received' },
+			{ name: 'List Confirmed', value: 'list.confirmed', description: 'A subscription was confirmed (double opt-in)' },
+			{ name: 'List Pending', value: 'list.pending', description: 'A subscription is pending confirmation' },
+			{ name: 'List Removed', value: 'list.removed', description: 'A contact was removed from a list' },
+			{ name: 'List Resubscribed', value: 'list.resubscribed', description: 'A contact resubscribed to a list' },
+			{ name: 'List Subscribed', value: 'list.subscribed', description: 'A contact subscribed to a list' },
+			{ name: 'List Unsubscribed', value: 'list.unsubscribed', description: 'A contact unsubscribed from a list' },
+		],
+	},
+	{
+		value: 'segment',
+		name: 'Segment',
+		eventsField: 'segmentEvents',
+		events: [
+			{ name: 'Segment Joined', value: 'segment.joined', description: 'A contact joined a segment' },
+			{ name: 'Segment Left', value: 'segment.left', description: 'A contact left a segment' },
+		],
+	},
+	{
+		value: 'email',
+		name: 'Email',
+		eventsField: 'emailEvents',
+		events: [
+			{ name: 'Email Bounced', value: 'email.bounced', description: 'An email bounced' },
+			{ name: 'Email Clicked', value: 'email.clicked', description: 'A link in an email was clicked' },
+			{ name: 'Email Complained', value: 'email.complained', description: 'A spam complaint was received' },
+			{ name: 'Email Delivered', value: 'email.delivered', description: 'An email was delivered' },
+			{ name: 'Email Opened', value: 'email.opened', description: 'An email was opened' },
+			{ name: 'Email Sent', value: 'email.sent', description: 'An email was sent' },
+			{ name: 'Email Unsubscribed', value: 'email.unsubscribed', description: 'A recipient unsubscribed via an email' },
+		],
+	},
+	{
+		value: 'customEvent',
+		name: 'Custom Event',
+		eventsField: 'customEventEvents',
+		events: [
+			{ name: 'Custom Event Created', value: 'custom_event.created', description: 'A custom event was created' },
+			{ name: 'Custom Event Updated', value: 'custom_event.updated', description: 'A custom event was updated' },
+			{ name: 'Custom Event Deleted', value: 'custom_event.deleted', description: 'A custom event was deleted' },
+		],
+	},
+];
 
 /**
  * Verifies a Notifuse webhook payload using the Standard Webhooks spec
@@ -63,20 +126,36 @@ export function verifyStandardWebhookSignature(
 	});
 }
 
-/**
- * Builds the shared INodeTypeDescription for a Notifuse entity trigger.
- * Only the entity-specific config differs between triggers.
- */
-export function buildTriggerDescription(config: NotifuseTriggerConfig): INodeTypeDescription {
+/** Returns the events selected for the currently chosen resource (entity). */
+export function getSelectedEvents(this: IHookFunctions | IWebhookFunctions): string[] {
+	const resource = this.getNodeParameter('resource') as string;
+	const config = TRIGGER_RESOURCES.find((r) => r.value === resource);
+	if (!config) return [];
+	return (this.getNodeParameter(config.eventsField, []) as string[]) ?? [];
+}
+
+/** Builds the shared INodeTypeDescription for the single Notifuse Trigger node. */
+export function buildNotifuseTriggerDescription(): INodeTypeDescription {
+	const eventFields: INodeProperties[] = TRIGGER_RESOURCES.map((r) => ({
+		displayName: 'Events',
+		name: r.eventsField,
+		type: 'multiOptions',
+		required: true,
+		default: [],
+		options: r.events,
+		displayOptions: { show: { resource: [r.value] } },
+		description: `The ${r.name.toLowerCase()} events that should trigger this workflow`,
+	}));
+
 	return {
-		displayName: config.displayName,
-		name: config.name,
+		displayName: 'Notifuse Trigger',
+		name: 'notifuseTrigger',
 		group: ['trigger'],
 		version: 1,
-		subtitle: '={{$parameter["events"].join(", ")}}',
-		description: `Starts the workflow when Notifuse ${config.entity.toLowerCase()} events occur`,
+		subtitle: '={{$parameter["resource"]}}',
+		description: 'Starts the workflow when Notifuse events occur',
 		defaults: {
-			name: config.displayName,
+			name: 'Notifuse Trigger',
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -98,19 +177,20 @@ export function buildTriggerDescription(config: NotifuseTriggerConfig): INodeTyp
 		],
 		properties: [
 			{
-				displayName: 'Events',
-				name: 'events',
-				type: 'multiOptions',
-				required: true,
-				default: [],
-				options: config.eventOptions,
-				description: 'The event types that should trigger this workflow',
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: TRIGGER_RESOURCES.map((r) => ({ name: r.name, value: r.value })),
+				default: 'contact',
+				description: 'The Notifuse entity whose events you want to listen to',
 			},
+			...eventFields,
 			{
 				displayName: 'Subscription Name',
 				name: 'subscriptionName',
 				type: 'string',
-				default: `n8n - ${config.entity}`,
+				default: 'n8n - Notifuse',
 				required: true,
 				description: 'Name of the webhook subscription created in Notifuse',
 			},
@@ -135,7 +215,7 @@ export function buildTriggerDescription(config: NotifuseTriggerConfig): INodeTyp
 	};
 }
 
-/** Shared webhook request handler for every Notifuse entity trigger. */
+/** Shared webhook request handler for the Notifuse Trigger node. */
 export async function notifuseTriggerWebhook(
 	this: IWebhookFunctions,
 ): Promise<IWebhookResponseData> {
@@ -144,7 +224,7 @@ export async function notifuseTriggerWebhook(
 	const headers = this.getHeaderData() as IDataObject;
 	const securityOptions = this.getNodeParameter('options', {}) as WebhookSecurityOptions;
 	const verifySignature = this.getNodeParameter('verifySignature', true) as boolean;
-	const selectedEvents = this.getNodeParameter('events', []) as string[];
+	const selectedEvents = getSelectedEvents.call(this);
 
 	const corsHeaders = buildResponseHeaders(securityOptions, req.headers.origin);
 	const denyRequest = (code: number, message: string) => {
@@ -213,7 +293,7 @@ export async function notifuseTriggerWebhook(
 	};
 }
 
-/** Shared self-registration lifecycle for every Notifuse entity trigger. */
+/** Shared self-registration lifecycle for the Notifuse Trigger node. */
 export const notifuseTriggerWebhookMethods = {
 	default: {
 		async checkExists(this: IHookFunctions): Promise<boolean> {
@@ -222,7 +302,7 @@ export const notifuseTriggerWebhookMethods = {
 				return false;
 			}
 
-			const selectedEvents = (this.getNodeParameter('events', []) as string[]).slice().sort();
+			const selectedEvents = getSelectedEvents.call(this).slice().sort();
 
 			try {
 				const response = await notifuseApiRequest.call(
@@ -248,7 +328,7 @@ export const notifuseTriggerWebhookMethods = {
 		async create(this: IHookFunctions): Promise<boolean> {
 			const webhookUrl = this.getNodeWebhookUrl('default');
 			const staticData = this.getWorkflowStaticData('node');
-			const events = this.getNodeParameter('events', []) as string[];
+			const events = getSelectedEvents.call(this);
 			const subscriptionName = this.getNodeParameter('subscriptionName') as string;
 
 			if (events.length === 0) {

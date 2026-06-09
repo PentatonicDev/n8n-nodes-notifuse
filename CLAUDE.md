@@ -19,9 +19,12 @@ nodes/Notifuse/
                                           applies Bearer auth
   resources/<resource>.ts                 One module per resource: <r>Operations, <r>Fields, executeX
   shared/webhookHelpers.ts                IP allowlist / CORS / bot filtering for triggers
-  shared/triggerFunctions.ts             buildTriggerDescription + shared webhook handler +
-                                          self-registration lifecycle + Standard Webhooks verify
-nodes/Notifuse<Entity>Trigger/            Thin trigger classes (config only) using the factory
+  shared/triggerFunctions.ts             TRIGGER_RESOURCES + buildNotifuseTriggerDescription +
+                                          shared webhook handler + self-registration lifecycle +
+                                          Standard Webhooks verify
+nodes/NotifuseTrigger/                    Single "Notifuse Trigger" node: Resource (entity) +
+                                          per-resource Events; named so n8n groups it under the
+                                          "Notifuse" app (base name must match the action node)
 ```
 
 `nodes/Notifuse/resources/contact.ts` is the **golden reference** for resource modules.

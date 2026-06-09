@@ -14,7 +14,7 @@ workflow automation platform.
 - [Credentials](#credentials)
 - [Nodes](#nodes)
   - [Notifuse (action node)](#notifuse-action-node)
-  - [Trigger nodes](#trigger-nodes)
+  - [Trigger node](#trigger-node)
 - [Webhook security](#webhook-security)
 - [Resources](#resources)
 
@@ -66,22 +66,23 @@ Required API fields are exposed as required node fields; optional fields live un
 | **Custom Event** | Import |
 | **User** | Root Sign In (HMAC) |
 
-### Trigger nodes
+### Trigger node
 
-Five trigger nodes — one per event entity — each let you pick the events to listen for and
-**self-register a Notifuse webhook subscription** pointing at the n8n webhook URL. The
-subscription is created when the workflow is activated, re-created when the selected events
+A single **Notifuse Trigger** node mirrors the action node: pick a **Resource** (entity), then
+the **Events** to listen for. It **self-registers a Notifuse webhook subscription** pointing at
+the n8n webhook URL — created when the workflow is activated, re-created when the selected events
 change, and deleted when the workflow is deactivated.
 
-| Trigger node | Events |
+| Resource | Events |
 | --- | --- |
-| **Notifuse Contact Trigger** | `contact.created`, `contact.updated`, `contact.deleted` |
-| **Notifuse List Trigger** | `list.subscribed`, `list.unsubscribed`, `list.confirmed`, `list.resubscribed`, `list.bounced`, `list.complained`, `list.pending`, `list.removed` |
-| **Notifuse Segment Trigger** | `segment.joined`, `segment.left` |
-| **Notifuse Email Trigger** | `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`, `email.unsubscribed` |
-| **Notifuse Custom Event Trigger** | `custom_event.created`, `custom_event.updated`, `custom_event.deleted` |
+| **Contact** | `contact.created`, `contact.updated`, `contact.deleted` |
+| **List** | `list.subscribed`, `list.unsubscribed`, `list.confirmed`, `list.resubscribed`, `list.bounced`, `list.complained`, `list.pending`, `list.removed` |
+| **Segment** | `segment.joined`, `segment.left` |
+| **Email** | `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`, `email.unsubscribed` |
+| **Custom Event** | `custom_event.created`, `custom_event.updated`, `custom_event.deleted` |
 
-Each event is delivered to the workflow as a separate item with `{ id, type, timestamp, workspace_id, data }`.
+Use one trigger node per entity you want to listen to. Each event is delivered to the workflow
+as a separate item with `{ id, type, timestamp, workspace_id, data }`.
 
 ## Webhook security
 

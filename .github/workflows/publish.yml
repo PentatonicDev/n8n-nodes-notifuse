@@ -133,11 +133,7 @@ jobs:
             ### Action Node
             - Notifuse - Contacts, Lists, Broadcasts, Templates, Transactional, Custom Events
 
-            ### Trigger Nodes (self-registering webhooks)
-            - Notifuse Contact Trigger
-            - Notifuse List Trigger
-            - Notifuse Segment Trigger
-            - Notifuse Email Trigger
-            - Notifuse Custom Event Trigger
+            ### Trigger Node (self-registering webhooks)
+            - Notifuse Trigger - Contact, List, Segment, Email, Custom Event events
           draft: false
           prerelease: false

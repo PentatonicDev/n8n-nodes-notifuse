@@ -1,6 +1,6 @@
 {
 	"name": "@pentatonic-dev/n8n-nodes-notifuse",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "n8n nodes for Notifuse - transactional email and newsletter management platform",
 	"keywords": [
 		"n8n-community-node-package",
@@ -45,11 +45,7 @@
 		],
 		"nodes": [
 			"dist/nodes/Notifuse/Notifuse.node.js",
-			"dist/nodes/NotifuseContactTrigger/NotifuseContactTrigger.node.js",
-			"dist/nodes/NotifuseListTrigger/NotifuseListTrigger.node.js",
-			"dist/nodes/NotifuseSegmentTrigger/NotifuseSegmentTrigger.node.js",
-			"dist/nodes/NotifuseEmailTrigger/NotifuseEmailTrigger.node.js",
-			"dist/nodes/NotifuseCustomEventTrigger/NotifuseCustomEventTrigger.node.js"
+			"dist/nodes/NotifuseTrigger/NotifuseTrigger.node.js"
 		]
 	},
 	"devDependencies": {
