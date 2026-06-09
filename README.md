@@ -67,11 +67,10 @@ Required API fields are exposed as required node fields; optional fields live un
 
 ### Trigger node
 
-A single **Notifuse Trigger** node groups events by **Resource** (entity); pick the resource then
-the **Events** to listen for (each event is also selectable per-entity directly from the "Notifuse"
-app in the nodes panel). It **self-registers a Notifuse webhook subscription** pointing at the n8n
-webhook URL — created when the workflow is activated, re-created when the selected events change,
-and deleted when the workflow is deactivated.
+A single **Notifuse Trigger** node exposes all webhook event types in one **Events** field
+(entity-prefixed, e.g. "Contact Created", "Email Opened"). It **self-registers a Notifuse webhook
+subscription** pointing at the n8n webhook URL — created when the workflow is activated, re-created
+when the selected events change, and deleted when the workflow is deactivated.
 
 | Entity | Events |
 | --- | --- |

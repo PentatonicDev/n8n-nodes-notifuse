@@ -1,6 +1,6 @@
 {
 	"name": "@pentatonic-dev/n8n-nodes-notifuse",
-	"version": "1.3.0",
+	"version": "1.4.0",
 	"description": "n8n nodes for Notifuse - transactional email and newsletter management platform",
 	"keywords": [
 		"n8n-community-node-package",

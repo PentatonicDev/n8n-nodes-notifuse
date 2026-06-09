@@ -3,7 +3,6 @@ import {
 	IDataObject,
 	IHookFunctions,
 	INodeExecutionData,
-	INodeProperties,
 	INodePropertyOptions,
 	INodeTypeDescription,
 	IWebhookFunctions,
@@ -22,75 +21,36 @@ import {
 } from './webhookHelpers';
 
 /**
- * Webhook event types grouped by entity. The trigger node is structured as
- * `resource` (entity) + a per-resource `operation` (multiOptions of events).
- * This mirrors the action node so n8n's node creator groups the events into
- * per-entity sections in the panel (via `resourceCategories`). The `action`
- * label is the short text shown under each entity header; `name` is the full
- * label shown in the in-node multiOptions dropdown.
+ * All Notifuse webhook event types, exposed as a single "Events" multiOptions
+ * field. Names are entity-prefixed so the (flat) list reads grouped by entity.
+ * n8n has no per-entity grouping for trigger events (only actions support the
+ * Resource split), so a single clear list is the correct, stable choice.
  */
-export const TRIGGER_RESOURCES: Array<{
-	value: string;
-	name: string;
-	events: INodePropertyOptions[];
-}> = [
-	{
-		value: 'contact',
-		name: 'Contact',
-		events: [
-			{ name: 'Contact Created', value: 'contact.created', action: 'Created', description: 'A contact was created' },
-			{ name: 'Contact Updated', value: 'contact.updated', action: 'Updated', description: 'A contact was updated' },
-			{ name: 'Contact Deleted', value: 'contact.deleted', action: 'Deleted', description: 'A contact was deleted' },
-		],
-	},
-	{
-		value: 'list',
-		name: 'List',
-		events: [
-			{ name: 'List Bounced', value: 'list.bounced', action: 'Bounced', description: 'A list email bounced' },
-			{ name: 'List Complained', value: 'list.complained', action: 'Complained', description: 'A list spam complaint was received' },
-			{ name: 'List Confirmed', value: 'list.confirmed', action: 'Confirmed', description: 'A subscription was confirmed (double opt-in)' },
-			{ name: 'List Pending', value: 'list.pending', action: 'Pending', description: 'A subscription is pending confirmation' },
-			{ name: 'List Removed', value: 'list.removed', action: 'Removed', description: 'A contact was removed from a list' },
-			{ name: 'List Resubscribed', value: 'list.resubscribed', action: 'Resubscribed', description: 'A contact resubscribed to a list' },
-			{ name: 'List Subscribed', value: 'list.subscribed', action: 'Subscribed', description: 'A contact subscribed to a list' },
-			{ name: 'List Unsubscribed', value: 'list.unsubscribed', action: 'Unsubscribed', description: 'A contact unsubscribed from a list' },
-		],
-	},
-	{
-		value: 'segment',
-		name: 'Segment',
-		events: [
-			{ name: 'Segment Joined', value: 'segment.joined', action: 'Joined', description: 'A contact joined a segment' },
-			{ name: 'Segment Left', value: 'segment.left', action: 'Left', description: 'A contact left a segment' },
-		],
-	},
-	{
-		value: 'email',
-		name: 'Email',
-		events: [
-			{ name: 'Email Bounced', value: 'email.bounced', action: 'Bounced', description: 'An email bounced' },
-			{ name: 'Email Clicked', value: 'email.clicked', action: 'Clicked', description: 'A link in an email was clicked' },
-			{ name: 'Email Complained', value: 'email.complained', action: 'Complained', description: 'An email spam complaint was received' },
-			{ name: 'Email Delivered', value: 'email.delivered', action: 'Delivered', description: 'An email was delivered' },
-			{ name: 'Email Opened', value: 'email.opened', action: 'Opened', description: 'An email was opened' },
-			{ name: 'Email Sent', value: 'email.sent', action: 'Sent', description: 'An email was sent' },
-			{ name: 'Email Unsubscribed', value: 'email.unsubscribed', action: 'Unsubscribed', description: 'A recipient unsubscribed via an email' },
-		],
-	},
-	{
-		value: 'customEvent',
-		name: 'Custom Event',
-		events: [
-			{ name: 'Custom Event Created', value: 'custom_event.created', action: 'Created', description: 'A custom event was created' },
-			{ name: 'Custom Event Updated', value: 'custom_event.updated', action: 'Updated', description: 'A custom event was updated' },
-			{ name: 'Custom Event Deleted', value: 'custom_event.deleted', action: 'Deleted', description: 'A custom event was deleted' },
-		],
-	},
+export const TRIGGER_EVENTS: INodePropertyOptions[] = [
+	{ name: 'Contact Created', value: 'contact.created', description: 'A contact was created', action: 'Contact created' },
+	{ name: 'Contact Updated', value: 'contact.updated', description: 'A contact was updated', action: 'Contact updated' },
+	{ name: 'Contact Deleted', value: 'contact.deleted', description: 'A contact was deleted', action: 'Contact deleted' },
+	{ name: 'List Bounced', value: 'list.bounced', description: 'A list email bounced', action: 'List bounced' },
+	{ name: 'List Complained', value: 'list.complained', description: 'A list spam complaint was received', action: 'List complained' },
+	{ name: 'List Confirmed', value: 'list.confirmed', description: 'A subscription was confirmed (double opt-in)', action: 'List confirmed' },
+	{ name: 'List Pending', value: 'list.pending', description: 'A subscription is pending confirmation', action: 'List pending' },
+	{ name: 'List Removed', value: 'list.removed', description: 'A contact was removed from a list', action: 'List removed' },
+	{ name: 'List Resubscribed', value: 'list.resubscribed', description: 'A contact resubscribed to a list', action: 'List resubscribed' },
+	{ name: 'List Subscribed', value: 'list.subscribed', description: 'A contact subscribed to a list', action: 'List subscribed' },
+	{ name: 'List Unsubscribed', value: 'list.unsubscribed', description: 'A contact unsubscribed from a list', action: 'List unsubscribed' },
+	{ name: 'Segment Joined', value: 'segment.joined', description: 'A contact joined a segment', action: 'Segment joined' },
+	{ name: 'Segment Left', value: 'segment.left', description: 'A contact left a segment', action: 'Segment left' },
+	{ name: 'Email Bounced', value: 'email.bounced', description: 'An email bounced', action: 'Email bounced' },
+	{ name: 'Email Clicked', value: 'email.clicked', description: 'A link in an email was clicked', action: 'Email clicked' },
+	{ name: 'Email Complained', value: 'email.complained', description: 'An email spam complaint was received', action: 'Email complained' },
+	{ name: 'Email Delivered', value: 'email.delivered', description: 'An email was delivered', action: 'Email delivered' },
+	{ name: 'Email Opened', value: 'email.opened', description: 'An email was opened', action: 'Email opened' },
+	{ name: 'Email Sent', value: 'email.sent', description: 'An email was sent', action: 'Email sent' },
+	{ name: 'Email Unsubscribed', value: 'email.unsubscribed', description: 'A recipient unsubscribed via an email', action: 'Email unsubscribed' },
+	{ name: 'Custom Event Created', value: 'custom_event.created', description: 'A custom event was created', action: 'Custom event created' },
+	{ name: 'Custom Event Updated', value: 'custom_event.updated', description: 'A custom event was updated', action: 'Custom event updated' },
+	{ name: 'Custom Event Deleted', value: 'custom_event.deleted', description: 'A custom event was deleted', action: 'Custom event deleted' },
 ];
-
-/** Flat list of all event type values (used for validation/tests). */
-export const TRIGGER_EVENTS: INodePropertyOptions[] = TRIGGER_RESOURCES.flatMap((r) => r.events);
 
 /**
  * Verifies a Notifuse webhook payload using the Standard Webhooks spec
@@ -126,32 +86,19 @@ export function verifyStandardWebhookSignature(
 	});
 }
 
-/** Returns the events selected on the trigger node (the per-resource `operation` field). */
+/** Returns the events selected on the trigger node. */
 export function getSelectedEvents(this: IHookFunctions | IWebhookFunctions): string[] {
-	return (this.getNodeParameter('operation', []) as string[]) ?? [];
+	return (this.getNodeParameter('events', []) as string[]) ?? [];
 }
 
 /** Builds the shared INodeTypeDescription for the single Notifuse Trigger node. */
 export function buildNotifuseTriggerDescription(): INodeTypeDescription {
-	// One `operation` multiOptions field per resource, so n8n's node creator
-	// groups the events into per-entity sections in the panel (resourceCategories).
-	const eventFields: INodeProperties[] = TRIGGER_RESOURCES.map((r) => ({
-		displayName: 'Events',
-		name: 'operation',
-		type: 'multiOptions',
-		required: true,
-		default: [],
-		options: r.events,
-		displayOptions: { show: { resource: [r.value] } },
-		description: `The ${r.name.toLowerCase()} events that should trigger this workflow`,
-	}));
-
 	return {
 		displayName: 'Notifuse Trigger',
 		name: 'notifuseTrigger',
 		group: ['trigger'],
 		version: 1,
-		subtitle: '={{$parameter["resource"]}}',
+		subtitle: '={{$parameter["events"].join(", ")}}',
 		description: 'Starts the workflow when Notifuse events occur',
 		defaults: {
 			name: 'Notifuse Trigger',
@@ -176,15 +123,14 @@ export function buildNotifuseTriggerDescription(): INodeTypeDescription {
 		],
 		properties: [
 			{
-				displayName: 'Resource',
-				name: 'resource',
-				type: 'options',
-				noDataExpression: true,
-				options: TRIGGER_RESOURCES.map((r) => ({ name: r.name, value: r.value })),
-				default: 'contact',
-				description: 'The Notifuse entity whose events you want to listen to',
+				displayName: 'Events',
+				name: 'events',
+				type: 'multiOptions',
+				required: true,
+				default: [],
+				options: TRIGGER_EVENTS,
+				description: 'The Notifuse events that should trigger this workflow',
 			},
-			...eventFields,
 			{
 				displayName: 'Subscription Name',
 				name: 'subscriptionName',

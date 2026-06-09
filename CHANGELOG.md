@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-09
+
+### Changed
+
+- **Reverted the trigger to a single flat `Events` field** (as in 1.2.0). The 1.3.0 resource +
+  per-resource `operation` structure made n8n's node creator double-list events and show bare,
+  context-less labels ("Created" three times, etc.). The flat, entity-prefixed list is clearer
+  and stable. n8n does not support per-entity grouping for trigger events.
+
 ## [1.3.0] - 2026-06-09
 
 ### Fixed
