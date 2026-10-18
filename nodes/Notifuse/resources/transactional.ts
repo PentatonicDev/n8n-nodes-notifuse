@@ -27,12 +27,27 @@ export const transactionalOperations: INodeProperties[] = [
 				description: 'Send a transactional notification to a contact',
 				action: 'Send a transactional notification',
 			},
+			{
+				name: 'Get Status',
+				value: 'getStatus',
+				description: 'Get the delivery history of a notification sent with an External ID',
+				action: 'Get transactional notification status',
+			},
 		],
 		default: 'send',
 	},
 ];
 
 export const transactionalFields: INodeProperties[] = [
+	{
+		displayName: 'External ID',
+		name: 'externalId',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: { show: { resource: ['transactional'], operation: ['getStatus'] } },
+		description: 'External ID used when the notification was sent',
+	},
 	{
 		displayName: 'Notification ID',
 		name: 'notificationId',
@@ -215,6 +230,22 @@ export async function executeTransactional(
 		if (Object.keys(emailOpts).length) notification.email_options = emailOpts;
 
 		return await notifuseApiRequest.call(this, 'POST', '/api/transactional.send', { notification });
+	}
+
+	if (operation === 'getStatus') {
+		const externalId = this.getNodeParameter('externalId', i) as string;
+		const page = await notifuseApiRequest.call(this, 'GET', '/api/messages.list', {}, {
+			external_id: externalId,
+			limit: 10,
+		});
+		const messages = (page.messages as IDataObject[]) ?? [];
+		return {
+			externalId,
+			found: messages.length > 0,
+			sent: messages.some((m) => m.sent_at && !m.failed_at),
+			failed: messages.length > 0 && messages.every((m) => Boolean(m.failed_at)),
+			messages,
+		};
 	}
 
 	return {};

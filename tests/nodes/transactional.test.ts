@@ -73,3 +73,27 @@ describe('Notifuse Transactional resource', () => {
 		expect(notification).not.toHaveProperty('email_options');
 	});
 });
+
+describe('Notifuse Transactional getStatus', () => {
+	const run = async (messages: object[]) => {
+		const { ctx, httpRequestWithAuthentication } = createExecuteFunctionsMock({
+			params: { externalId: 'wf:1:123' },
+			apiResponse: { messages, has_more: false },
+		});
+		const result = (await executeTransactional.call(ctx, 'getStatus', 0)) as Record<string, unknown>;
+		return { result, req: firstAuthRequest(httpRequestWithAuthentication) };
+	};
+
+	it('queries message history by external_id', async () => {
+		const { req } = await run([]);
+		expect(req.method).toBe('GET');
+		expect(req.url).toBe('https://notifuse.test/api/messages.list');
+		expect(req.qs).toMatchObject({ workspace_id: 'ws_test', external_id: 'wf:1:123' });
+	});
+
+	it('reports not found, sent and failed deliveries', async () => {
+		expect((await run([])).result).toMatchObject({ found: false, sent: false, failed: false });
+		expect((await run([{ sent_at: '2026-10-18T00:00:00Z' }])).result).toMatchObject({ found: true, sent: true, failed: false });
+		expect((await run([{ sent_at: '2026-10-18T00:00:00Z', failed_at: '2026-10-18T00:00:01Z' }])).result).toMatchObject({ found: true, sent: false, failed: true });
+	});
+});
